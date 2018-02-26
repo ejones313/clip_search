@@ -8,9 +8,13 @@ import random
 
 class Dataset(data.Dataset):
 
-    def __init__(self, filename, anchor_is_phrase = True):
-        pairs_dict = pickle.load( open( filename, "rb" ) )
-        self.triplet_dict = self.make_triplets(pairs_dict, anchor_is_phrase)
+    def __init__(self, filename = None, anchor_is_phrase = True, data = None):
+        if filename != None:
+            self.pairs_dict = pickle.load( open( filename, "rb" ) )
+        elif data != None:
+            self.pairs_dict = dict(data)
+
+        #self.triplet_dict = self.make_triplets(pairs_dict, anchor_is_phrase, num_negative = 1)
         self.curr_index = 0
 
 
@@ -18,7 +22,7 @@ class Dataset(data.Dataset):
         """
         Mechanism for naievely constructing triplets. Pairs_dict is our loaded data,
         in dictionary form, containing values of (video, caption, vid_id). Anchor_is_phrase
-        determines whether or not the anchor is the caption of the clip. Based on this variable,
+        determines whether or not the anchor is the caption of the word. Based on this variable,
         constructs num_negative triples of (anchor, corresponding positive, corresponding negative)
         for each anchor in the dataset. Return value is a dictionary with nonnegative integer
         keys and values corresponding to the triple. 
@@ -42,10 +46,11 @@ class Dataset(data.Dataset):
         return triplet_dict
 
     def __len__(self):
-        return len(self.triplet_dict)
+        return len(self.triplets_caption)
 
     def __getitem__(self, index):
-        triplet =  self.triplet_dict[index]
+        triplet = self.triplets_caption[index]
+        #triplet =  self.triplet_dict[index]
         return triplet
 
     def reset_counter(self):
@@ -53,6 +58,46 @@ class Dataset(data.Dataset):
         Resets every epoch, since we avoid the incomplete batch
         """
         self.curr_index = 0
+
+    
+    def get_dataset(self):
+        embedding_tuples = list(self.pairs_dict.values())
+        words = []
+        vids = []
+        word_lengths = []
+        vid_lengths = []
+        for i in range(len(embedding_tuples)):
+            item = embedding_tuples[i]
+            vids.append(item[0])
+            words.append(item[1])
+            vid_lengths.append(item[0].shape[0])
+            word_lengths.append(item[1].shape[0])
+
+        #For pytorch, sorts the components of the triples by the length of the sequence (will be unsorted correctly later)
+        word_lengths, word_indices = torch.sort(torch.IntTensor(word_lengths), descending = True)
+        vid_lengths, vid_indices = torch.sort(torch.IntTensor(vid_lengths), descending = True)
+        
+        #Initializes array to copy things with different lengths to (and thus to pad)
+        max_word = word_lengths[0]
+        max_vid = vid_lengths[0]
+        
+        word_padded = np.zeros((max_word, len(embedding_tuples), words[0].shape[1]))
+        vid_padded = np.zeros((max_vid, len(embedding_tuples), vids[0].shape[1]))
+        
+        #Effectively pads sequences with zeroes
+        for i in range(len(embedding_tuples)):
+            word_padded[0:word_lengths[i], i, 0:words[0].shape[1]] = words[word_indices[i]]
+            vid_padded[0:vid_lengths[i], i, 0:vids[0].shape[1]] = vids[vid_indices[i]]
+            
+        #Converts to variables
+        words = Variable(torch.from_numpy(np.array(word_padded)).float())
+        vids = Variable(torch.from_numpy(np.array(vid_padded)).float())
+        
+        #Obnoxious pytorch thing
+        words = nn.utils.rnn.pack_padded_sequence(words, list(word_lengths))
+        vids = nn.utils.rnn.pack_padded_sequence(vids, list(vid_lengths))
+        
+        return (words, vids), (word_indices, vid_indices)
 
 
     def get_batch(self, batch_size):
@@ -96,6 +141,7 @@ class Dataset(data.Dataset):
         max_positive = positive_lengths[0]
         max_negative = negative_lengths[0]
 
+        #print(anchors[0].shape)
         anchor_padded = np.zeros((max_anchor, batch_size, anchors[0].shape[1]))
         positive_padded = np.zeros((max_positive, batch_size, positives[0].shape[1]))
         negative_padded = np.zeros((max_negative, batch_size, negatives[0].shape[1]))
@@ -117,3 +163,44 @@ class Dataset(data.Dataset):
         negatives = nn.utils.rnn.pack_padded_sequence(negatives, list(negative_lengths))
 
         return (anchors, positives, negatives), (anchor_indices, positive_indices, negative_indices)
+
+
+
+
+    def triplet_loss(self, A, P, N, margin=1.0):
+        #pos_dist = np.linalg.norm(A-P)
+        #neg_dist = np.linalg.norm(A-N)
+        pos_dist = torch.norm(A-P).data
+        neg_dist = torch.norm(A-N).data
+        return float(pos_dist - neg_dist + margin)
+
+
+
+    def mine_triplets_all(self, embedding_tuples):
+        triplets_caption = []
+        triplets_clips = []
+        captions = embedding_tuples[0]
+        clips = embedding_tuples[1]
+
+        for index in range(len(captions)):
+            anchor = captions[index]
+            positive = clips[index]
+            for neg_index in range(len(clips)):
+                negative = clips[neg_index]
+                if self.triplet_loss(anchor, positive, negative) > 0:
+                    #Caption is anchor
+                    triplets_caption.append((anchor, positive, negative))
+
+                temp = anchor
+                anchor = positive
+                positive = temp
+
+                negative = captions[neg_index]
+                if self.triplet_loss(anchor, positive, negative) > 0:
+                    #Clip is anchor
+                    triplets_clips.append((anchor, positive, negative))
+
+        self.triplets_caption = triplets_caption
+        self.triplets_clips = triplets_clips
+
+        return len(triplets_caption), len(triplets_clips)
