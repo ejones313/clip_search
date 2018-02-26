@@ -82,14 +82,18 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     word_unscrambled = unscramble(word_output, word_lengths, word_indices, len(word_indices))
     video_unscrambled = unscramble(video_output, video_lengths, video_indices, len(word_indices))
 
-    num_triplets, _ = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled))   
+    num_triplets, _ = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled)) 
+    print(num_triplets)  
 
     batch_size = params.batch_size
     num_batches = num_triplets // batch_size
     
     #Iterate through all batches except the incomplete one.
     for batch_num in range(0,num_batches-1):
+        print(batch_num)
         batch, indices = dataSet.get_batch(batch_size)
+        print('got here 1')
+
 
         anchor_batch = batch[0]
         positive_batch = batch[1]
@@ -108,6 +112,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             anchor_output = vid_model(anchor_batch)
             positive_output = word_model(positive_batch)
             negative_output = word_model(negative_batch)
+
 
         #Undo pack_padded_sequence
         anchor_output, anchor_lengths = nn.utils.rnn.pad_packed_sequence(anchor_output)

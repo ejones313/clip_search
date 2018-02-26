@@ -92,6 +92,9 @@ class Dataset(data.Dataset):
         #Converts to variables
         words = Variable(torch.from_numpy(np.array(word_padded)).float())
         vids = Variable(torch.from_numpy(np.array(vid_padded)).float())
+
+        self.words_backup = words
+        self.vids_backup = vids
         
         #Obnoxious pytorch thing
         words = nn.utils.rnn.pack_padded_sequence(words, list(word_lengths))
@@ -141,7 +144,6 @@ class Dataset(data.Dataset):
         max_positive = positive_lengths[0]
         max_negative = negative_lengths[0]
 
-        #print(anchors[0].shape)
         anchor_padded = np.zeros((max_anchor, batch_size, anchors[0].shape[1]))
         positive_padded = np.zeros((max_positive, batch_size, positives[0].shape[1]))
         negative_padded = np.zeros((max_negative, batch_size, negatives[0].shape[1]))
@@ -179,26 +181,36 @@ class Dataset(data.Dataset):
     def mine_triplets_all(self, embedding_tuples):
         triplets_caption = []
         triplets_clips = []
-        captions = embedding_tuples[0]
-        clips = embedding_tuples[1]
+        captions_out = embedding_tuples[0]
+        clips_out = embedding_tuples[1]
+        captions_in = self.words_backup
+        clips_in = self.vids_backup
 
-        for index in range(len(captions)):
-            anchor = captions[index]
-            positive = clips[index]
-            for neg_index in range(len(clips)):
-                negative = clips[neg_index]
-                if self.triplet_loss(anchor, positive, negative) > 0:
+        for index in range(captions_in.shape[1]):
+            anchor = captions_in[:,index,:]
+            anchor_embedding = captions_out[index]
+            positive = clips_in[:,index,:]
+            positive_embedding = clips_out[index]
+
+            for neg_index in range(clips_in.shape[1]):
+                negative = clips_in[:,neg_index,:]
+                negative_embedding = clips_out[neg_index]
+                if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
                     #Caption is anchor
-                    triplets_caption.append((anchor, positive, negative))
+                    triplets_caption.append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
 
                 temp = anchor
                 anchor = positive
                 positive = temp
+                temp = anchor_embedding
+                anchor_embedding = positive_embedding
+                positive_embedding = temp
 
-                negative = captions[neg_index]
-                if self.triplet_loss(anchor, positive, negative) > 0:
+                negative = captions_in[:,neg_index,:]
+                negative_embedding = captions_out[neg_index]
+                if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
                     #Clip is anchor
-                    triplets_clips.append((anchor, positive, negative))
+                    triplets_clips.append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
 
         self.triplets_caption = triplets_caption
         self.triplets_clips = triplets_clips
