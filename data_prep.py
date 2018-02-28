@@ -144,20 +144,34 @@ class Dataset(data.Dataset):
         max_positive = positive_lengths[0]
         max_negative = negative_lengths[0]
 
-        anchor_padded = np.zeros((max_anchor, batch_size, anchors[0].shape[1]))
-        positive_padded = np.zeros((max_positive, batch_size, positives[0].shape[1]))
-        negative_padded = np.zeros((max_negative, batch_size, negatives[0].shape[1]))
+        #anchor_padded = np.zeros((max_anchor, batch_size, anchors[0].shape[1]))
+        #positive_padded = np.zeros((max_positive, batch_size, positives[0].shape[1]))
+        #negative_padded = np.zeros((max_negative, batch_size, negatives[0].shape[1]))
+        anchor_padded = torch.zeros(max_anchor, batch_size, anchors[0].shape[1])
+        positive_padded = torch.zeros(max_positive, batch_size, positives[0].shape[1])
+        negative_padded = torch.zeros(max_negative, batch_size, negatives[0].shape[1])
 
         #Effectively pads sequences with zeroes
         for i in range(batch_size):
-            anchor_padded[0:anchor_lengths[i], i, 0:anchors[0].shape[1]] = anchors[anchor_indices[i]]
-            positive_padded[0:positive_lengths[i], i, 0:positives[0].shape[1]] = positives[positive_indices[i]]
-            negative_padded[0:negative_lengths[i], i, 0:negatives[0].shape[1]] = negatives[negative_indices[i]]
+            #print(anchors[0].shape[1])
+            #print(positives[0].shape[1])
+            #print(negatives[0].shape[1])
+            #print(anchors[anchor_indices[0]].shape)
+            #print(positives[positive_indices[0]].shape)
+            #print(negatives[negative_indices[0]].shape)
+            #pause = input("wait")
+            anchor_padded[0:anchor_lengths[i], i, 0:anchors[0].shape[1]] = anchors[anchor_indices[i]].data
+            positive_padded[0:positive_lengths[i], i, 0:positives[0].shape[1]] = positives[positive_indices[i]].data
+            negative_padded[0:negative_lengths[i], i, 0:negatives[0].shape[1]] = negatives[negative_indices[i]].data
+
 
         #Converts to variables
-        anchors = Variable(torch.from_numpy(np.array(anchor_padded)).float())
-        positives = Variable(torch.from_numpy(np.array(positive_padded)).float())
-        negatives = Variable(torch.from_numpy(np.array(negative_padded)).float())
+        #anchors = Variable(torch.from_numpy(np.array(anchor_padded)).float())
+        #positives = Variable(torch.from_numpy(np.array(positive_padded)).float())
+        #negatives = Variable(torch.from_numpy(np.array(negative_padded)).float())
+        anchors = Variable(anchor_padded.float())
+        positives = Variable(positive_padded.float())
+        negatives = Variable(negative_padded.float())
 
         #Obnoxious pytorch thing
         anchors = nn.utils.rnn.pack_padded_sequence(anchors, list(anchor_lengths))

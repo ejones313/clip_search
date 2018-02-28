@@ -94,7 +94,6 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         batch, indices = dataSet.get_batch(batch_size)
         print('got here 1')
 
-
         anchor_batch = batch[0]
         positive_batch = batch[1]
         negative_batch = batch[2]
