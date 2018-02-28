@@ -204,9 +204,9 @@ class Dataset(data.Dataset):
 
         for index in range(captions_in.shape[1]):
             anchor = captions_in[:,index,:]
-            anchor_embedding = captions_out[index]
+            anchor_embedding = captions_out[index, :]
             positive = clips_in[:,index,:]
-            positive_embedding = clips_out[index]
+            positive_embedding = clips_out[index, :]
 
             for neg_index in range(clips_in.shape[1]):
                 negative = clips_in[:,neg_index,:]
@@ -228,7 +228,15 @@ class Dataset(data.Dataset):
                     #Clip is anchor
                     triplets_clips.append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
 
+                temp = anchor
+                anchor = positive
+                positive = temp
+                temp = anchor_embedding
+                anchor_embedding = positive_embedding
+                positive_embedding = temp
+
         self.triplets_caption = triplets_caption
         self.triplets_clips = triplets_clips
+
 
         return len(triplets_caption), len(triplets_clips)
