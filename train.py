@@ -14,6 +14,10 @@ import utils
 import net
 import data_prep
 from torch.autograd import Variable
+import pickle
+import math
+
+from valid import validate
 
 
 parser = argparse.ArgumentParser()
@@ -59,13 +63,38 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     vid_model.zero_grad()
 
     #Calculate number of batches
-    batch_size = params.batch_size
-    dataset_size = len(dataSet)
-    num_batches = dataset_size // batch_size
+    #batch_size = params.batch_size
+    #dataset_size = len(dataSet)
+    #num_batches = dataset_size // batch_size
 
+    #
+    packed_dataset, indices = dataSet.get_dataset()
+    words = packed_dataset[0]
+    vids = packed_dataset[1]
+    word_indices = indices[0]
+    video_indices = indices[1]
+    word_output = word_model(words)
+    video_output = vid_model(vids)
+
+    #Undo pack_padded_sequence
+    word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
+    video_output, video_lengths = nn.utils.rnn.pad_packed_sequence(video_output)
+
+    #Unscramble output, and unpad
+    word_unscrambled = unscramble(word_output, word_lengths, word_indices, len(word_indices))
+    video_unscrambled = unscramble(video_output, video_lengths, video_indices, len(word_indices))
+
+    num_triplets, _ = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled)) 
+    print(num_triplets)  
+
+    batch_size = params.batch_size
+    num_batches = num_triplets // batch_size
+    
     #Iterate through all batches except the incomplete one.
     for batch_num in range(0,num_batches-1):
+        print(batch_num)
         batch, indices = dataSet.get_batch(batch_size)
+        print('got here 1')
 
         anchor_batch = batch[0]
         positive_batch = batch[1]
@@ -85,6 +114,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             positive_output = word_model(positive_batch)
             negative_output = word_model(negative_batch)
 
+
         #Undo pack_padded_sequence
         anchor_output, anchor_lengths = nn.utils.rnn.pad_packed_sequence(anchor_output)
         positive_output, positive_lengths = nn.utils.rnn.pad_packed_sequence(positive_output)
@@ -96,10 +126,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size)
 
         #Compute loss over the batch
-        loss = 0
-        for i in range(batch_size):
-            loss += loss_fn(anchor_output[-2:-1,i,:], positive_output[-2:-1,i,:], negative_output[-2:-1,i,:])
-        loss = loss/batch_size
+        loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
 
         print("Loss", loss.data)
 
@@ -114,7 +141,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         vid_optimizer.step()
 
 
-def train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params, anchor_is_phrase = True):
+def train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params, anchor_is_phrase = True, subset_size = 50):
     """Train the model over many epochs
     Args:
         word_model: (torch.nn.Module) the LSTM for word embeddings
@@ -125,7 +152,7 @@ def train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vi
         loss_fn: a function that takes batch_output and batch_labels and computes the loss for the batch
         dataSet: (Dataset class) custom dataset class containing the data
         params: (Params) hyperparameters
-        anchor_is_prhase: (bool) Defines the anchor (true is phrase, false is clip)
+        anchor_is_phrase: (bool) Defines the anchor (true is phrase, false is clip)
     """
     # reload weights from restore_file if specified
     #if restore_file is not None:
@@ -134,13 +161,20 @@ def train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vi
     #    utils.load_checkpoint(restore_path, model, optimizer)
     
     #Load train dataset
-    train_dataset = data_prep.Dataset(train_filename)
+    full_dataset = pickle.load( open( train_filename, "rb" ) )
+    tuple_list = full_dataset.items()
+    datasets = []
+    for i in range(math.ceil(len(tuple_list)/subset_size)):
+        # Add case for subset size not divisible by length
+        datasets.append(data_prep.Dataset(data = list(tuple_list)[subset_size*i:(i+1)*subset_size]))
+    #train_dataset = data_prep.Dataset(train_filename)
 
     #Train
     for epoch in range(params.num_epochs):
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
-        train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params, anchor_is_phrase)
-        train_dataset.reset_counter()
+        for dataset in datasets:
+            train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params, anchor_is_phrase)
+            train_dataset.reset_counter()
     
 
 if __name__ == '__main__':
@@ -157,7 +191,7 @@ if __name__ == '__main__':
     params.word_hidden_dim = 600
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
-    params.batch_size = 5
+    params.batch_size = 4
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
@@ -187,4 +221,9 @@ if __name__ == '__main__':
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params)
+    #train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params)
+    validation_dataset = data_prep.Dataset(filename = 'subset.pkl', anchor_is_phrase = True)
+    print(validate(word_model, vid_model, validation_dataset))
+
+
+

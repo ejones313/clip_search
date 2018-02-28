@@ -9,6 +9,27 @@ def triplet_loss(A, P, N, margin=0.0):
 def mine_triplets_all(embedding_tuples):
     triplets_caption = []
     triplets_clips = []
+    captions = embedding_tuples[0]
+    clips = embedding_tuples[1]
+
+    for index in len(captions):
+        anchor = captions[index]
+        positive = clips[index]
+        for neg_index in len(clips):
+            negative = clips[neg_index]
+            if triplet_loss(anchor, positive, negative) > 0:
+                #Caption is anchor
+                triplets_caption.append((anchor, positive, negative))
+
+            temp = anchor
+            anchor = positive
+            positive = temp
+
+            negative = captions[neg_index]
+            if triplet_loss(anchor, positive, negative) > 0:
+                #Clip is anchor
+                triplets_clips.append((anchor, positive, negative))
+    '''
     for tuple in embedding_tuples:
         anchor = tuple[0]
         positive = tuple[1]
@@ -24,6 +45,7 @@ def mine_triplets_all(embedding_tuples):
             negative = tuple[1]
             if triplet_loss(anchor, positive, negative) > 0:
                 triplets_clips.append((anchor, positive, negative))
+    '''
     return triplets_caption, triplets_clips
 
 def mine_triplets_random(embedding_tuples):
