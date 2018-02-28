@@ -223,7 +223,7 @@ if __name__ == '__main__':
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     #train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params)
     validation_dataset = data_prep.Dataset(filename = 'subset.pkl', anchor_is_phrase = True)
-    validate(word_model, vid_model, validation_dataset)
+    print(validate(word_model, vid_model, validation_dataset))
 
 
 
