@@ -17,6 +17,8 @@ from torch.autograd import Variable
 import pickle
 import math
 
+from valid import validate
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/small', help="Directory containing the dataset")
@@ -150,7 +152,7 @@ def train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vi
         loss_fn: a function that takes batch_output and batch_labels and computes the loss for the batch
         dataSet: (Dataset class) custom dataset class containing the data
         params: (Params) hyperparameters
-        anchor_is_prhase: (bool) Defines the anchor (true is phrase, false is clip)
+        anchor_is_phrase: (bool) Defines the anchor (true is phrase, false is clip)
     """
     # reload weights from restore_file if specified
     #if restore_file is not None:
@@ -219,4 +221,9 @@ if __name__ == '__main__':
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params)
+    #train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params)
+    validation_dataset = data_prep.Dataset(filename = 'subset.pkl', anchor_is_phrase = True)
+    validate(word_model, vid_model, validation_dataset)
+
+
+
