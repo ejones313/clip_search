@@ -170,7 +170,7 @@ def train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vi
         for dataset in datasets:
             print('New subepoch')
             train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params, anchor_is_phrase)
-            train_dataset.reset_counter()
+            #train_dataset.reset_counter()
     
 
 if __name__ == '__main__':
