@@ -93,8 +93,8 @@ class Dataset(data.Dataset):
         words = Variable(torch.from_numpy(np.array(word_padded)).float())
         vids = Variable(torch.from_numpy(np.array(vid_padded)).float())
 
-        self.words_backup = words
-        self.vids_backup = vids
+        self.words_backup = words.clone()
+        self.vids_backup = vids.clone()
         
         #Obnoxious pytorch thing
         words = nn.utils.rnn.pack_padded_sequence(words, list(word_lengths))
@@ -160,6 +160,8 @@ class Dataset(data.Dataset):
             #print(positives[positive_indices[0]].shape)
             #print(negatives[negative_indices[0]].shape)
             #pause = input("wait")
+            print(anchors[0].shape[1])
+            print(anchor_lengths)
             anchor_padded[0:anchor_lengths[i], i, 0:anchors[0].shape[1]] = anchors[anchor_indices[i]].data
             positive_padded[0:positive_lengths[i], i, 0:positives[0].shape[1]] = positives[positive_indices[i]].data
             negative_padded[0:negative_lengths[i], i, 0:negatives[0].shape[1]] = negatives[negative_indices[i]].data

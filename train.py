@@ -162,7 +162,7 @@ def train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vi
     full_dataset = pickle.load( open( train_filename, "rb" ) )
     tuple_list = full_dataset.items()
     datasets = []
-    for i in range(math.ceil(len(tuple_list)/subset_size)):
+    for i in range(math.floor(len(tuple_list)/subset_size)):
         # Add case for subset size not divisible by length
         datasets.append(data_prep.Dataset(data = list(tuple_list)[subset_size*i:(i+1)*subset_size]))
     #train_dataset = data_prep.Dataset(train_filename)
