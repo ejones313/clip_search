@@ -46,32 +46,13 @@ class Dataset(data.Dataset):
         return dataset, lengths, num_tuples
     
     def get_dataset(self):
-        #First is vids, second is tuples
+        #First is vids, second is captions
         dataset, lengths, num_tuples = self.retrieve_embeddings()
+
+        # Sorted indices, first is vids, second is captions
         indices = [[],[]]
 
-        for type in range(2):
-            #For pytorch, sorts the components of the triples by the length of the sequence (will be unsorted correctly later)
-            lengths[type], indices[type] = torch.sort(torch.IntTensor(lengths[type]), descending = True)
-        
-            #Initializes array to copy things with different lengths to (and thus to pad)
-            max = lengths[type][0]
-            padded = np.zeros((max, num_tuples, dataset[type][0].shape[1]))
-        
-            #Effectively pads sequences with zeroes
-            for i in range(num_tuples):
-                padded[0:lengths[type][i], i, 0:dataset[type][0].shape[1]] = dataset[type][indices[type][i]]
-            
-            #Converts to variables
-            dataset[type] = Variable(torch.from_numpy(np.array(padded)).float())
-
-            if type == 1:
-                self.words_backup = dataset[1].clone()
-            else:
-                self.vids_backup = dataset[0].clone()
-
-            # Obnoxious pytorch thing
-            dataset[type] = nn.utils.rnn.pack_padded_sequence(dataset[type], list(lengths[type]))
+        datasets, indices = self.sort_pad_sequence(2, num_tuples, dataset, lengths, indices, True)
 
         return (dataset[1], dataset[0]), (indices[1], indices[0])
 
@@ -109,19 +90,40 @@ class Dataset(data.Dataset):
 
         examples, lengths = self.retrieve_triples(batch_size)
 
-        for example_type in range(3):
-            # For pytorch, sorts the components of the triples by the length of the sequence (will be unsorted correctly later)
+        examples, indices = self.sort_pad_sequence(3, batch_size, examples, lengths, indices, False)
+
+        return examples, indices
+
+    def sort_pad_sequence(self, num_types, batch_size, examples, lengths, indices, backup):
+        for example_type in range(num_types):
+            # For pytorch, sorts the components of the data tuples by the length of the sequence (will be unsorted correctly later)
             lengths[example_type], indices[example_type] = torch.sort(torch.IntTensor(lengths[example_type]), descending=True)
 
             max = lengths[example_type][0]
-            padded = torch.zeros(max, batch_size, examples[example_type][0].shape[1])
+            if backup:
+                padded = np.zeros((max, batch_size, examples[example_type][0].shape[1]))
+            else:
+                padded = torch.zeros(max, batch_size, examples[example_type][0].shape[1])
 
             # Effectively pads sequences with zeroes
             for i in range(batch_size):
-                padded[0:lengths[example_type][i], i, 0:examples[example_type][0].shape[1]] = examples[example_type][indices[example_type][i]].data
+                var = examples[example_type][indices[example_type][i]]
+                if backup:
+                    padded[0:lengths[example_type][i], i, 0:examples[example_type][0].shape[1]] = var
+                else:
+                    padded[0:lengths[example_type][i], i, 0:examples[example_type][0].shape[1]] = var.data
 
             # Convert to Variables
+            if backup:
+                padded = torch.from_numpy(np.array(padded))
             examples[example_type] = Variable(padded.float())
+
+            # Backup variables if necessary
+            if backup:
+                if example_type == 1:
+                    self.words_backup = examples[1].clone()
+                elif example_type == 0:
+                    self.vids_backup = examples[0].clone()
 
             # Obnoxious pytorch thing
             examples[example_type] = nn.utils.rnn.pack_padded_sequence(examples[example_type], list(lengths[example_type]))
