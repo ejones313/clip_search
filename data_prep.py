@@ -17,34 +17,6 @@ class Dataset(data.Dataset):
         #self.triplet_dict = self.make_triplets(pairs_dict, anchor_is_phrase, num_negative = 1)
         self.curr_index = 0
 
-
-    def make_triplets(self, pairs_dict, anchor_is_phrase, num_negative = 3):
-        """
-        Mechanism for naievely constructing triplets. Pairs_dict is our loaded data,
-        in dictionary form, containing values of (video, caption, vid_id). Anchor_is_phrase
-        determines whether or not the anchor is the caption of the word. Based on this variable,
-        constructs num_negative triples of (anchor, corresponding positive, corresponding negative)
-        for each anchor in the dataset. Return value is a dictionary with nonnegative integer
-        keys and values corresponding to the triple. 
-        """
-        triplet_dict = {}
-        counter = 0
-        for key in pairs_dict:
-            video, caption, vid_id = pairs_dict[key]
-            for j in range(num_negative):
-                rand_key = random.choice(list(pairs_dict.keys()))
-                while rand_key == key:
-                    rand_key = random.choice(list(pairs_dict.keys()))
-                rvideo, rcaption, rvid_id = pairs_dict[rand_key]
-                triple = None
-                if anchor_is_phrase:
-                    triple = (caption, video, rvideo)
-                else:
-                    triple = (video, caption, rcaption)
-                triplet_dict[counter] = triple
-                counter += 1
-        return triplet_dict
-
     def __len__(self):
         return len(self.triplets_caption)
 
@@ -59,48 +31,49 @@ class Dataset(data.Dataset):
         """
         self.curr_index = 0
 
+    def retrieve_embeddings(self):
+        embedding_tuples = list(self.pairs_dict.values())
+        dataset = [[],[]]
+        lengths = [[],[]]
+        num_tuples = len(embedding_tuples)
+
+        for i in range(num_tuples):
+            item = embedding_tuples[i]
+            for type in range(2):
+                dataset[type].append(item[type])
+                lengths[type].append(item[type].shape[0])
+
+        return dataset, lengths, num_tuples
     
     def get_dataset(self):
-        embedding_tuples = list(self.pairs_dict.values())
-        words = []
-        vids = []
-        word_lengths = []
-        vid_lengths = []
-        for i in range(len(embedding_tuples)):
-            item = embedding_tuples[i]
-            vids.append(item[0])
-            words.append(item[1])
-            vid_lengths.append(item[0].shape[0])
-            word_lengths.append(item[1].shape[0])
+        #First is vids, second is tuples
+        dataset, lengths, num_tuples = self.retrieve_embeddings()
+        indices = [[],[]]
 
-        #For pytorch, sorts the components of the triples by the length of the sequence (will be unsorted correctly later)
-        word_lengths, word_indices = torch.sort(torch.IntTensor(word_lengths), descending = True)
-        vid_lengths, vid_indices = torch.sort(torch.IntTensor(vid_lengths), descending = True)
+        for type in range(2):
+            #For pytorch, sorts the components of the triples by the length of the sequence (will be unsorted correctly later)
+            lengths[type], indices[type] = torch.sort(torch.IntTensor(lengths[type]), descending = True)
         
-        #Initializes array to copy things with different lengths to (and thus to pad)
-        max_word = word_lengths[0]
-        max_vid = vid_lengths[0]
+            #Initializes array to copy things with different lengths to (and thus to pad)
+            max = lengths[type][0]
+            padded = np.zeros((max, num_tuples, dataset[type][0].shape[1]))
         
-        word_padded = np.zeros((max_word, len(embedding_tuples), words[0].shape[1]))
-        vid_padded = np.zeros((max_vid, len(embedding_tuples), vids[0].shape[1]))
-        
-        #Effectively pads sequences with zeroes
-        for i in range(len(embedding_tuples)):
-            word_padded[0:word_lengths[i], i, 0:words[0].shape[1]] = words[word_indices[i]]
-            vid_padded[0:vid_lengths[i], i, 0:vids[0].shape[1]] = vids[vid_indices[i]]
+            #Effectively pads sequences with zeroes
+            for i in range(num_tuples):
+                padded[0:lengths[type][i], i, 0:dataset[type][0].shape[1]] = dataset[type][indices[type][i]]
             
-        #Converts to variables
-        words = Variable(torch.from_numpy(np.array(word_padded)).float())
-        vids = Variable(torch.from_numpy(np.array(vid_padded)).float())
+            #Converts to variables
+            dataset[type] = Variable(torch.from_numpy(np.array(padded)).float())
 
-        self.words_backup = words.clone()
-        self.vids_backup = vids.clone()
-        
-        #Obnoxious pytorch thing
-        words = nn.utils.rnn.pack_padded_sequence(words, list(word_lengths))
-        vids = nn.utils.rnn.pack_padded_sequence(vids, list(vid_lengths))
-        
-        return (words, vids), (word_indices, vid_indices)
+            if type == 1:
+                self.words_backup = dataset[1].clone()
+            else:
+                self.vids_backup = dataset[0].clone()
+
+            # Obnoxious pytorch thing
+            dataset[type] = nn.utils.rnn.pack_padded_sequence(dataset[type], list(lengths[type]))
+
+        return (dataset[1], dataset[0]), (indices[1], indices[0])
 
     def retrieve_triples(self, batch_size):
         # APN Examples. First is anchors, second is positives, third is negatives.
