@@ -544,3 +544,7 @@
 2018-02-28 15:13:04,699:INFO: - done.
 2018-02-28 15:13:04,749:INFO: Starting training for 10 epoch(s)
 2018-02-28 15:13:04,906:INFO: Epoch 1/10
+2018-02-28 16:37:59,086:INFO: Loading the datasets...
+2018-02-28 16:37:59,088:INFO: - done.
+2018-02-28 16:37:59,136:INFO: Starting training for 10 epoch(s)
+2018-02-28 16:37:59,358:INFO: Epoch 1/10

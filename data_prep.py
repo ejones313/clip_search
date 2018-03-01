@@ -94,24 +94,32 @@ class Dataset(data.Dataset):
 
         return examples, indices
 
+    # Pads sequences with zeros to make a square tensor.
+    def pad_sequences(self, batch_size, example, length, index, backup):
+        # Find max length sequence given the sorted lengths and examples
+        max = length[0]
+        if backup:
+            padded = np.zeros((max, batch_size, example[0].shape[1]))
+        else:
+            padded = torch.zeros(max, batch_size, example[0].shape[1])
+
+        # Effectively pads sequences with zeroes
+        for i in range(batch_size):
+            var = example[index[i]]
+            if backup:
+                padded[0:length[i], i, 0:example[0].shape[1]] = var
+            else:
+                padded[0:length[i], i, 0:example[0].shape[1]] = var.data
+
+        return padded
+
+    # Sorts variable length inputs and packs them into packedsequences.
     def sort_pad_sequence(self, num_types, batch_size, examples, lengths, indices, backup):
         for example_type in range(num_types):
             # For pytorch, sorts the components of the data tuples by the length of the sequence (will be unsorted correctly later)
             lengths[example_type], indices[example_type] = torch.sort(torch.IntTensor(lengths[example_type]), descending=True)
 
-            max = lengths[example_type][0]
-            if backup:
-                padded = np.zeros((max, batch_size, examples[example_type][0].shape[1]))
-            else:
-                padded = torch.zeros(max, batch_size, examples[example_type][0].shape[1])
-
-            # Effectively pads sequences with zeroes
-            for i in range(batch_size):
-                var = examples[example_type][indices[example_type][i]]
-                if backup:
-                    padded[0:lengths[example_type][i], i, 0:examples[example_type][0].shape[1]] = var
-                else:
-                    padded[0:lengths[example_type][i], i, 0:examples[example_type][0].shape[1]] = var.data
+            padded = self.pad_sequences(batch_size, examples[example_type], lengths[example_type], indices[example_type], backup)
 
             # Convert to Variables
             if backup:
