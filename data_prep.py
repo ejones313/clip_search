@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.utils.data as data
 from torch.autograd import Variable
 import pickle
-import random
 
 class Dataset(data.Dataset):
 
@@ -14,7 +13,6 @@ class Dataset(data.Dataset):
         elif data != None:
             self.pairs_dict = dict(data)
 
-        #self.triplet_dict = self.make_triplets(pairs_dict, anchor_is_phrase, num_negative = 1)
         self.curr_index = 0
 
     def __len__(self):
@@ -22,7 +20,6 @@ class Dataset(data.Dataset):
 
     def __getitem__(self, index):
         triplet = self.triplets_caption[index]
-        #triplet =  self.triplet_dict[index]
         return triplet
 
     def reset_counter(self):
