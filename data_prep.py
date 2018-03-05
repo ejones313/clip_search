@@ -30,6 +30,8 @@ class Dataset(data.Dataset):
 
     def retrieve_embeddings(self):
         embedding_tuples = list(self.pairs_dict.values())
+
+        # Pairs of positive examples. First is videos, second is captions.
         dataset = [[],[]]
         lengths = [[],[]]
         num_tuples = len(embedding_tuples)
@@ -43,7 +45,7 @@ class Dataset(data.Dataset):
         return dataset, lengths, num_tuples
     
     def get_dataset(self):
-        #First is vids, second is captions
+        #First is vids, second is captions in dataset
         dataset, lengths, num_tuples = self.retrieve_embeddings()
 
         # Sorted indices, first is vids, second is captions
@@ -169,14 +171,15 @@ class Dataset(data.Dataset):
 
             # Loop over clips
             for neg_index in range(inputs[0].shape[1]):
-                # Check both possible triples for positive loss
-                for anchor_type in range(2):
-                    negative = inputs[anchor_type][:,neg_index,:]
-                    negative_embedding = outputs[anchor_type][neg_index]
-                    if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
-                        captions[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
+                if index != neg_index:
+                    # Check both possible triples for positive loss
+                    for anchor_type in range(2):
+                        negative = inputs[anchor_type][:,neg_index,:]
+                        negative_embedding = outputs[anchor_type][neg_index]
+                        if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
+                            captions[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
 
-                    anchor, positive, anchor_embedding, positive_embedding = self.swap(anchor, positive, anchor_embedding, positive_embedding)
+                        anchor, positive, anchor_embedding, positive_embedding = self.swap(anchor, positive, anchor_embedding, positive_embedding)
 
         self.triplets_caption = captions[0]
         self.triplets_clips = captions[1]
