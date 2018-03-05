@@ -84,13 +84,16 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     word_unscrambled = unscramble(word_output, word_lengths, word_indices, len(word_indices))
     video_unscrambled = unscramble(video_output, video_lengths, video_indices, len(word_indices))
 
-    num_triplets, _ = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled))
+    num_triplets, _ = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),(word_lengths, video_lengths))
 
     batch_size = params.batch_size
     num_batches = num_triplets // batch_size
+
+    print(num_triplets)
     
     #Iterate through all batches except the incomplete one.
     for batch_num in range(0,num_batches-1):
+        print(batch_num)
         batch, indices = dataSet.get_batch(batch_size)
 
         anchor_batch = batch[0]
@@ -101,6 +104,11 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         positive_indices = indices[1]
         negative_indices = indices[2]
 
+        '''print("Pre LSTM")
+        print(nn.utils.rnn.pad_packed_sequence(anchor_batch))
+        print(nn.utils.rnn.pad_packed_sequence(positive_batch))
+        print(nn.utils.rnn.pad_packed_sequence(negative_batch))
+        print("")'''
         # compute model output and loss, putting each component of the batch into the appropriate LSTM
         if anchor_is_phrase:
             anchor_output = word_model(anchor_batch)
@@ -117,12 +125,27 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         positive_output, positive_lengths = nn.utils.rnn.pad_packed_sequence(positive_output)
         negative_output, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
 
+        '''print(anchor_lengths)
+        print(positive_lengths)
+        print(negative_lengths)
+
+        print("Pre unscramble")
+        print(anchor_output[np.array(anchor_lengths)-1,np.arange(0,4),:])
+        print(positive_output[np.array(positive_lengths)-1,np.arange(0,4),:])
+        print(negative_output[np.array(negative_lengths)-1,np.arange(0,4),:])
+        print("")'''
+
         #Unscramble output, and unpad
         anchor_unscrambled = unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size)
         positive_unscrambled = unscramble(positive_output, positive_lengths, positive_indices, batch_size)
         negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size)
 
         #Compute loss over the batch
+        '''print("Post unscramble")
+        print(anchor_unscrambled)
+        print(positive_unscrambled)
+        print(negative_unscrambled)
+        print("")'''
         loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
 
         print("Loss", loss.data)
@@ -219,7 +242,7 @@ if __name__ == '__main__':
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    #train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params)
+    train_and_evaluate(word_model, vid_model, train_filename, word_optimizer, vid_optimizer, loss_fn, params)
     validation_dataset = data_prep.Dataset(filename = 'subset.pkl', anchor_is_phrase = True)
     print(validate(word_model, vid_model, validation_dataset))
 

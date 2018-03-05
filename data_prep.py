@@ -68,11 +68,12 @@ class Dataset(data.Dataset):
                 self.curr_index = 0
                 break
             item = self.__getitem__(i)
+            item_lengths = self.triplets_caption_lengths[i]
 
             for example_type in range(3):
                 example = item[example_type]
                 examples[example_type].append(example)
-                lengths[example_type].append(example.shape[0])
+                lengths[example_type].append(item_lengths[example_type])
             self.curr_index += 1
 
         return examples, lengths
@@ -88,7 +89,6 @@ class Dataset(data.Dataset):
         indices=[[],[],[]]
 
         examples, lengths = self.retrieve_triples(batch_size)
-
         examples, indices = self.sort_pad_sequence(3, batch_size, examples, lengths, indices, False)
 
         return examples, indices
@@ -96,19 +96,19 @@ class Dataset(data.Dataset):
     # Pads sequences with zeros to make a square tensor.
     def pad_sequences(self, batch_size, example, length, index, backup):
         # Find max length sequence given the sorted lengths and examples
-        max = length[0]
+        max_len = length[0]
         if backup:
-            padded = np.zeros((max, batch_size, example[0].shape[1]))
+            padded = np.zeros((max_len, batch_size, example[0].shape[1]))
         else:
-            padded = torch.zeros(max, batch_size, example[0].shape[1])
+            padded = torch.zeros(max_len, batch_size, example[0].shape[1])
 
         # Effectively pads sequences with zeroes
         for i in range(batch_size):
             var = example[index[i]]
             if backup:
-                padded[0:length[i], i, 0:example[0].shape[1]] = var
+                padded[0:length[i], i, 0:example[0].shape[1]] = var[0:length[i],:]
             else:
-                padded[0:length[i], i, 0:example[0].shape[1]] = var.data
+                padded[0:length[i], i, 0:example[0].shape[1]] = var.data[0:length[i],:]
 
         return padded
 
@@ -117,6 +117,8 @@ class Dataset(data.Dataset):
         for example_type in range(num_types):
             # For pytorch, sorts the components of the data tuples by the length of the sequence (will be unsorted correctly later)
             lengths[example_type], indices[example_type] = torch.sort(torch.IntTensor(lengths[example_type]), descending=True)
+
+            padded = torch.zeros(lengths[example_type][0], batch_size, examples[example_type][0].shape[1])
 
             padded = self.pad_sequences(batch_size, examples[example_type], lengths[example_type], indices[example_type], backup)
 
@@ -154,8 +156,12 @@ class Dataset(data.Dataset):
 
         return anchor, positive, anchor_embedding, positive_embedding
 
-    def mine_triplets_all(self, embedding_tuples):
+    def mine_triplets_all(self, embedding_tuples, lengths_tuple):
+        # DON'T THINK THIS IS CORRECTLY MAKING THE VIDEO ANCHOR TRIPLETS RIGHT NOW
+
         captions = [[],[]]
+        #lengths = [[[],[],[]],[[],[],[]]]
+        lengths = [[],[]]
 
         #Tuples of inputs and outputs - First is clips, second is captions
         inputs = (self.vids_backup, self.words_backup)
@@ -178,10 +184,15 @@ class Dataset(data.Dataset):
                         negative_embedding = outputs[anchor_type][neg_index]
                         if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
                             captions[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
-
+                            lengths[anchor_type].append((lengths_tuple[anchor_type][index], lengths_tuple[1-anchor_type][index], lengths_tuple[1-anchor_type][neg_index]))
+                            
                         anchor, positive, anchor_embedding, positive_embedding = self.swap(anchor, positive, anchor_embedding, positive_embedding)
 
         self.triplets_caption = captions[0]
         self.triplets_clips = captions[1]
 
+        self.triplets_caption_lengths = lengths[0]
+        self.triplets_clips_lengths = lengths[1]
+
         return len(captions[0]), len(captions[1])
+
