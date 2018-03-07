@@ -96,18 +96,16 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
 
     batch_size = params.batch_size
     num_batches = min(num_triplets_word, num_triplets_vid) // batch_size
-
-    print(min(num_triplets_word, num_triplets_vid))
     
     #Iterate through all batches except the incomplete one.
     for batch_num in range(num_batches):
-        print(batch_num)
+        print(batch_num+1)
         for anchor_type in [True, False]:
             batch, indices = dataSet.get_batch(batch_size, anchor_is_phrase = anchor_type)
 
-            anchor_batch = batch[0]
-            positive_batch = batch[1]
-            negative_batch = batch[2]
+            anchor_batch = batch[0].cuda() if params.cuda else batch[0]
+            positive_batch = batch[1].cuda() if params.cuda else batch[1]
+            negative_batch = batch[2].cuda() if params.cuda else batch[2]
 
             anchor_indices = indices[0]
             positive_indices = indices[1]
@@ -133,6 +131,11 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             anchor_unscrambled = unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size)
             positive_unscrambled = unscramble(positive_output, positive_lengths, positive_indices, batch_size)
             negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size)
+
+            if params.cuda:
+                anchor_unscrambled = anchor_unscrambled.cuda()
+                positive_unscrambled = anchor_unscrambled.cuda()
+                negative_unscrambled = anchor_unscrambled.cuda()
 
             #Compute loss over the batch
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
@@ -261,6 +264,7 @@ if __name__ == '__main__':
     loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin = 0.2)
 
     # Train the model
+    print(params.cuda)
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 100)
 
