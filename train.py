@@ -63,7 +63,8 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         anchor_is_phrase: (bool) Defines the anchor (true is phrase, false is clip)
     """
 
-    # set model to training mode. 
+    # set model to training mode.
+    loss_var = 0
     word_model.train()
     vid_model.train()
     word_model.zero_grad()
@@ -137,6 +138,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
 
             print("Loss", loss.data)
+            loss_var = loss.data
 
             # clear previous gradients, compute gradients of all variables wrt loss
             vid_optimizer.zero_grad()
@@ -147,6 +149,8 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             # performs updates using calculated gradients
             word_optimizer.step()
             vid_optimizer.step()
+
+    return loss_var
 
 
 def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is_phrase = True, subset_size = 50):
@@ -184,12 +188,14 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
     for i in range(math.floor(len(tuple_list)/subset_size)):
         datasets.append(data_prep.Dataset(data = list(tuple_list)[subset_size*i:(i+1)*subset_size]))
 
+    train_losses = []
     #Train
     for epoch in range(params.num_epochs):
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         for dataset in datasets:
             print('New subepoch')
-            train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params)
+            train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params)
+            train_losses.append(train_loss)
             dataset.reset_counter()
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
         val_scores = validate(word_model, vid_model, validation_dataset)
@@ -199,6 +205,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'word_optim_dict': word_optimizer.state_dict(),
                                 'vid_optim_dict': vid_optimizer.state_dict(),
                                 'val_scores': val_scores,
+                                'train_losses': train_losses
                                 checkpoint="weights_and_val"
             }
         )
