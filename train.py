@@ -240,8 +240,8 @@ if __name__ == '__main__':
     
     # load data
     filenames = {}
-    filenames["train"] = 'subset.pkl'
-    filenames["val"] = 'subset.pkl'
+    filenames["train"] = 'subset_1000.pkl'
+    filenames["val"] = 'val_500.pkl'
     logging.info("- done.")
 
     # Define the models and optimizers
@@ -263,8 +263,6 @@ if __name__ == '__main__':
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 100)
-    validation_dataset = data_prep.Dataset(filename = 'subset.pkl', anchor_is_phrase = True)
-    #print(validate(word_model, vid_model, validation_dataset))
 
 
 
