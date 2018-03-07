@@ -5,7 +5,7 @@ import torch.utils.data as data
 from torch.autograd import Variable
 import pickle
 
-class Dataset(data.Dataset):
+class Dataset():
 
     def __init__(self, filename = None, anchor_is_phrase = True, data = None):
         if filename != None:
@@ -13,20 +13,25 @@ class Dataset(data.Dataset):
         elif data != None:
             self.pairs_dict = dict(data)
 
-        self.curr_index = 0
+        self.curr_index_word = 0
+        self.curr_index_vid = 0
 
-    def __len__(self):
+    def len(self):
         return len(self.triplets_caption)
 
-    def __getitem__(self, index):
-        triplet = self.triplets_caption[index]
+    def getitem(self, index, anchor_is_phrase):
+        if anchor_is_phrase:
+            triplet = self.triplets_caption[index]
+        else:
+            triplet = self.triplets_clips[index]
         return triplet
 
     def reset_counter(self):
         """
         Resets every epoch, since we avoid the incomplete batch
         """
-        self.curr_index = 0
+        self.curr_index_word = 0
+        self.curr_index_vid = 0
 
     def retrieve_embeddings(self):
         embedding_tuples = list(self.pairs_dict.values())
@@ -55,40 +60,53 @@ class Dataset(data.Dataset):
 
         return (dataset[1], dataset[0]), (indices[1], indices[0])
 
-    def retrieve_triples(self, batch_size):
+    def retrieve_triples(self, batch_size, anchor_is_phrase):
         # APN Examples. First is anchors, second is positives, third is negatives.
         examples = [[],[],[]]
         # APN Sequence lengths. First is anchors, second is positives, third is negatives.
         lengths = [[],[],[]]
 
+        curr_index = self.curr_index_vid
+        if anchor_is_phrase:
+            curr_index = self.curr_index_word
+
         #Gets triplets, startaing at the first unused index. Num triplets
         #is batchsize.
-        for i in range(self.curr_index, self.curr_index + batch_size):
-            if (i >= self.__len__()):
-                self.curr_index = 0
-                break
-            item = self.__getitem__(i)
-            item_lengths = self.triplets_caption_lengths[i]
+        for i in range(curr_index, curr_index + batch_size):
+            if (i >= self.len()):
+                raise Exception("Exceeded batch length")
+
+            item = self.getitem(i, anchor_is_phrase)
+            if anchor_is_phrase:
+                item_lengths = self.triplets_caption_lengths[i]
+            else:
+                item_lengths = self.triplets_clips_lengths[i]
 
             for example_type in range(3):
                 example = item[example_type]
                 examples[example_type].append(example)
                 lengths[example_type].append(item_lengths[example_type])
-            self.curr_index += 1
+
+        if anchor_is_phrase:
+            self.curr_index_word += batch_size
+        else:
+            self.curr_index_vid += batch_size
 
         return examples, lengths
 
-    def get_batch(self, batch_size):
+    def get_batch(self, batch_size, anchor_is_phrase):
         """
         Returns two tuples. The first is the processed anchors, positives, and negatives
         Elements within anchors, positives, and negativesare padded (for pytorch, using packed_padded sequence). Basically just a
         lot of pytorch jargon to get a padded batch for model input. The second tuple contains mappings 
         back to the original indices (gets sorted in decreasing size), for use later. 
         """
+
         # APN indices for the sorted sequences. First is A, second is P, third is N.
         indices=[[],[],[]]
 
-        examples, lengths = self.retrieve_triples(batch_size)
+        examples, lengths = self.retrieve_triples(batch_size, anchor_is_phrase)
+
         examples, indices = self.sort_pad_sequence(3, batch_size, examples, lengths, indices, False)
         #for type in range(3): Look into this - examples is already sorted and padded.
         #    examples[type] = nn.utils.rnn.pack_padded_sequence(Variable(examples[type]), list(lengths[type]))

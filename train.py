@@ -2,11 +2,12 @@
 
 """
 QUESTIONS:
-    -Best way to mix video anchor and word anchor triplets
-    -Remine triplet frequency
     -Save model weights and validation scores
     -Train and val set sizes
-    
+    -Downsampling
+
+    -Remine triplet frequency
+
 """
 
 import argparse
@@ -52,7 +53,7 @@ def unscramble(output, lengths, original_indices, batch_size):
     return unscrambled_outputs
 
 
-def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet, params, anchor_is_phrase):
+def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet, params):
     """ Does gradient descent on one epoch
     Args:
         word_model: (torch.nn.Module) the LSTM for word embeddings
@@ -93,61 +94,62 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     word_unscrambled = unscramble(word_output, word_lengths, word_indices, len(word_indices))
     video_unscrambled = unscramble(video_output, video_lengths, video_indices, len(word_indices))
 
-    num_triplets, _ = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),(word_lengths, video_lengths))
+    num_triplets_word, num_triplets_vid = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),(word_lengths, video_lengths))
 
     batch_size = params.batch_size
-    num_batches = num_triplets // batch_size
+    num_batches = min(num_triplets_word, num_triplets_vid) // batch_size
 
-    print(num_triplets)
+    print(min(num_triplets_word, num_triplets_vid))
     
     #Iterate through all batches except the incomplete one.
-    for batch_num in range(0,num_batches-1):
+    for batch_num in range(num_batches):
         print(batch_num)
-        batch, indices = dataSet.get_batch(batch_size)
+        for anchor_type in [True, False]:
+            batch, indices = dataSet.get_batch(batch_size, anchor_is_phrase = anchor_type)
 
-        anchor_batch = batch[0]
-        positive_batch = batch[1]
-        negative_batch = batch[2]
+            anchor_batch = batch[0]
+            positive_batch = batch[1]
+            negative_batch = batch[2]
 
-        anchor_indices = indices[0]
-        positive_indices = indices[1]
-        negative_indices = indices[2]
+            anchor_indices = indices[0]
+            positive_indices = indices[1]
+            negative_indices = indices[2]
 
-        # compute model output and loss, putting each component of the batch into the appropriate LSTM
-        if anchor_is_phrase:
-            anchor_output = word_model(anchor_batch)
-            positive_output = vid_model(positive_batch)
-            negative_output = vid_model(negative_batch)
-        else:
-            anchor_output = vid_model(anchor_batch)
-            positive_output = word_model(positive_batch)
-            negative_output = word_model(negative_batch)
+            # compute model output and loss, putting each component of the batch into the appropriate LSTM
+            if anchor_type:
+                anchor_output = word_model(anchor_batch)
+                positive_output = vid_model(positive_batch)
+                negative_output = vid_model(negative_batch)
+            else:
+                anchor_output = vid_model(anchor_batch)
+                positive_output = word_model(positive_batch)
+                negative_output = word_model(negative_batch)
 
 
-        #Undo pack_padded_sequence
-        anchor_output, anchor_lengths = nn.utils.rnn.pad_packed_sequence(anchor_output)
-        positive_output, positive_lengths = nn.utils.rnn.pad_packed_sequence(positive_output)
-        negative_output, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
+            #Undo pack_padded_sequence
+            anchor_output, anchor_lengths = nn.utils.rnn.pad_packed_sequence(anchor_output)
+            positive_output, positive_lengths = nn.utils.rnn.pad_packed_sequence(positive_output)
+            negative_output, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
 
-        #Unscramble output, and unpad
-        anchor_unscrambled = unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size)
-        positive_unscrambled = unscramble(positive_output, positive_lengths, positive_indices, batch_size)
-        negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size)
+            #Unscramble output, and unpad
+            anchor_unscrambled = unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size)
+            positive_unscrambled = unscramble(positive_output, positive_lengths, positive_indices, batch_size)
+            negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size)
 
-        #Compute loss over the batch
-        loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
+            #Compute loss over the batch
+            loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
 
-        print("Loss", loss.data)
+            print("Loss", loss.data)
 
-        # clear previous gradients, compute gradients of all variables wrt loss
-        vid_optimizer.zero_grad()
-        word_optimizer.zero_grad()
-        #Backprop
-        loss.backward()
+            # clear previous gradients, compute gradients of all variables wrt loss
+            vid_optimizer.zero_grad()
+            word_optimizer.zero_grad()
+            #Backprop
+            loss.backward()
 
-        # performs updates using calculated gradients
-        word_optimizer.step()
-        vid_optimizer.step()
+            # performs updates using calculated gradients
+            word_optimizer.step()
+            vid_optimizer.step()
 
 
 def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is_phrase = True, subset_size = 50):
@@ -179,7 +181,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
 
     #Load train dataset
     full_dataset = pickle.load( open( train_filename, "rb" ) )
-    val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = True)
+    val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = anchor_is_phrase)
     tuple_list = full_dataset.items()
     datasets = []
     for i in range(math.floor(len(tuple_list)/subset_size)):
@@ -190,7 +192,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         for dataset in datasets:
             print('New subepoch')
-            train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params, anchor_is_phrase)
+            train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params)
             dataset.reset_counter()
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
         val_scores = validate(word_model, vid_model, validation_dataset)
