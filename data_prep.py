@@ -174,10 +174,26 @@ class Dataset():
 
         return anchor, positive, anchor_embedding, positive_embedding
 
+    def shuffle_together(self, a, b):
+        rng_state = np.random.get_state()
+        np.random.shuffle(a)
+        np.random.set_state(rng_state)
+        np.random.shuffle(b)
+
+    def save_triplets(self, triplets, lengths):
+        self.shuffle_together(triplets[0], lengths[0])
+        self.shuffle_together(triplets[1], lengths[1])
+
+        self.triplets_caption = triplets[0]
+        self.triplets_clips = triplets[1]
+
+        self.triplets_caption_lengths = lengths[0]
+        self.triplets_clips_lengths = lengths[1]
+
     def mine_triplets_all(self, embedding_tuples, lengths_tuple):
         # DON'T THINK THIS IS CORRECTLY MAKING THE VIDEO ANCHOR TRIPLETS RIGHT NOW
 
-        captions = [[],[]]
+        triplets = [[],[]]
         lengths = [[],[]]
 
         #Tuples of inputs and outputs - First is clips, second is captions
@@ -201,16 +217,12 @@ class Dataset():
                         negative_embedding = outputs[anchor_type][neg_index]
 
                         if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
-                            captions[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
+                            triplets[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
                             lengths[anchor_type].append((lengths_tuple[anchor_type][index], lengths_tuple[1-anchor_type][index], lengths_tuple[1-anchor_type][neg_index]))
                             
                         anchor, positive, anchor_embedding, positive_embedding = self.swap(anchor, positive, anchor_embedding, positive_embedding)
 
-        self.triplets_caption = captions[0]
-        self.triplets_clips = captions[1]
+        self.save_triplets(triplets, lengths)
 
-        self.triplets_caption_lengths = lengths[0]
-        self.triplets_clips_lengths = lengths[1]
-
-        return len(captions[0]), len(captions[1])
+        return len(triplets[0]), len(triplets[1])
 
