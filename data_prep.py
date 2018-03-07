@@ -216,7 +216,7 @@ class Dataset():
                         negative = inputs[anchor_type][:,neg_index,:]
                         negative_embedding = outputs[anchor_type][neg_index]
 
-                        if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
+                        if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding, margin = 0.2) > 0:
                             triplets[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
                             lengths[anchor_type].append((lengths_tuple[anchor_type][index], lengths_tuple[1-anchor_type][index], lengths_tuple[1-anchor_type][neg_index]))
                             

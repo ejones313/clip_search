@@ -2,12 +2,9 @@
 
 """
 QUESTIONS:
-    -Save model weights and validation scores
-    -Train and val set sizes
+    -Train: 10000, Val: 1000
     -Downsampling
-
-    -Remine triplet frequency
-
+    -When to regenerate triplets
 """
 
 import argparse
@@ -196,6 +193,15 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
             dataset.reset_counter()
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
         val_scores = validate(word_model, vid_model, validation_dataset)
+        utils.save_checkpoint({'epoch': epoch +1,
+                                'word_state_dict': word_model.state_dict(),
+                                'vid_state_dict': vid_model.state_dict(),
+                                'word_optim_dict': word_optimizer.state_dict(),
+                                'vid_optim_dict': vid_optimizer.state_dict(),
+                                'val_scores': val_scores,
+                                checkpoint="weights_and_val"
+            }
+        )
     
 
 if __name__ == '__main__':
@@ -212,7 +218,7 @@ if __name__ == '__main__':
     params.word_hidden_dim = 600
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
-    params.batch_size = 10
+    params.batch_size = 50
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
@@ -247,11 +253,11 @@ if __name__ == '__main__':
     optimizers["vid"] = vid_optimizer
     
     # fetch loss function and metrics
-    loss_fn = torch.nn.modules.loss.TripletMarginLoss()
+    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin = 0.2)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 10)
+    train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 100)
     validation_dataset = data_prep.Dataset(filename = 'subset.pkl', anchor_is_phrase = True)
     print(validate(word_model, vid_model, validation_dataset))
 
