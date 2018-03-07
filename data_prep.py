@@ -160,7 +160,6 @@ class Dataset(data.Dataset):
         # DON'T THINK THIS IS CORRECTLY MAKING THE VIDEO ANCHOR TRIPLETS RIGHT NOW
 
         captions = [[],[]]
-        #lengths = [[[],[],[]],[[],[],[]]]
         lengths = [[],[]]
 
         #Tuples of inputs and outputs - First is clips, second is captions
@@ -182,6 +181,7 @@ class Dataset(data.Dataset):
                     for anchor_type in range(2):
                         negative = inputs[anchor_type][:,neg_index,:]
                         negative_embedding = outputs[anchor_type][neg_index]
+
                         if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding) > 0:
                             captions[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
                             lengths[anchor_type].append((lengths_tuple[anchor_type][index], lengths_tuple[1-anchor_type][index], lengths_tuple[1-anchor_type][neg_index]))
