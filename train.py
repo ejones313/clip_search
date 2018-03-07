@@ -198,17 +198,15 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
             train_losses.append(train_loss)
             dataset.reset_counter()
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
-        val_scores = validate(word_model, vid_model, validation_dataset)
+        val_scores = validate(word_model, vid_model, val_dataset)
         utils.save_checkpoint({'epoch': epoch +1,
                                 'word_state_dict': word_model.state_dict(),
                                 'vid_state_dict': vid_model.state_dict(),
                                 'word_optim_dict': word_optimizer.state_dict(),
                                 'vid_optim_dict': vid_optimizer.state_dict(),
                                 'val_scores': val_scores,
-                                'train_losses': train_losses
-                                checkpoint="weights_and_val"
-            }
-        )
+                                'train_losses': train_losses},
+                                checkpoint="weights_and_val")
     
 
 if __name__ == '__main__':
@@ -266,7 +264,7 @@ if __name__ == '__main__':
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 100)
     validation_dataset = data_prep.Dataset(filename = 'subset.pkl', anchor_is_phrase = True)
-    print(validate(word_model, vid_model, validation_dataset))
+    #print(validate(word_model, vid_model, validation_dataset))
 
 
 
