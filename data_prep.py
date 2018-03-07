@@ -90,6 +90,9 @@ class Dataset(data.Dataset):
 
         examples, lengths = self.retrieve_triples(batch_size)
         examples, indices = self.sort_pad_sequence(3, batch_size, examples, lengths, indices, False)
+        #for type in range(3): Look into this - examples is already sorted and padded.
+        #    examples[type] = nn.utils.rnn.pack_padded_sequence(Variable(examples[type]), list(lengths[type]))
+        #    indices[type] = lengths[type]
 
         return examples, indices
 
@@ -207,4 +210,3 @@ class Dataset(data.Dataset):
         self.save_triplets(triplets, lengths)
 
         return len(triplets[0]), len(triplets[1])
-
