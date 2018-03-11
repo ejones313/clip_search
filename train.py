@@ -38,25 +38,6 @@ parser.add_argument('--restore_file', default=None,
                     training")  # 'best' or 'train'
 
 
-def unscramble(output, lengths, original_indices, batch_size, cuda = False):
-    """
-    Takes the output from the model, the lengths, and original_indices, and batch size.
-    Unscrambles the data, which had been sorted to make pack_padded_sequence work. 
-    Returns the unsscrambled and unpadded outputs. 
-    """
-    final_ids = (Variable(torch.from_numpy(np.array(lengths) - 1))).view(-1,1).expand(output.size(1),output.size(2)).unsqueeze(0)
-    if cuda:
-        final_ids = final_ids.cuda()
-    final_outputs = output.gather(0, final_ids).squeeze()#.unsqueeze(0)
-
-    mapping = original_indices.view(-1,1).expand(batch_size, output.size(2))
-    if cuda:
-        mapping = mapping.cuda()
-    unscrambled_outputs = final_outputs.gather(0, Variable(mapping))
-
-    return unscrambled_outputs
-
-
 def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet, params):
     """ Does gradient descent on one epoch
     Args:
@@ -96,8 +77,8 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     video_output, video_lengths = nn.utils.rnn.pad_packed_sequence(video_output)
 
     #Unscramble output, and unpad
-    word_unscrambled = unscramble(word_output, word_lengths, word_indices, len(word_indices))
-    video_unscrambled = unscramble(video_output, video_lengths, video_indices, len(word_indices))
+    word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda = params.cuda)
+    video_unscrambled = utils.unscramble(video_output, video_lengths, video_indices, len(word_indices), cuda = params.cuda)
 
     num_triplets_word, num_triplets_vid = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),(word_lengths, video_lengths))
 
@@ -136,9 +117,9 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             negative_output, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
 
             #Unscramble output, and unpad
-            anchor_unscrambled = unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size, cuda = params.cuda)
-            positive_unscrambled = unscramble(positive_output, positive_lengths, positive_indices, batch_size, cuda = params.cuda)
-            negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size, cuda = params.cuda)
+            anchor_unscrambled = utils.unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size, cuda = params.cuda)
+            positive_unscrambled = utils.unscramble(positive_output, positive_lengths, positive_indices, batch_size, cuda = params.cuda)
+            negative_unscrambled = utils.unscramble(negative_output, negative_lengths, negative_indices, batch_size, cuda = params.cuda)
 
             #Compute loss over the batch
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
@@ -204,13 +185,12 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         print("Starting epoch: {}. Time elapsed: {}".format(epoch, str(datetime.now()-start_time)))
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         for dataset in datasets:
-            #print('New subepoch')
             train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params)
             train_losses.append(train_loss)
             dataset.reset_counter()
 
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
-        val_scores = validate(word_model, vid_model, val_dataset)
+        val_scores = validate(word_model, vid_model, val_dataset, cuda = params.cuda)
         print("Train Loss: {}, Val Scores: Vid good: {} Word good: {} Total good {}".format(sum(train_losses)/len(train_losses), val_scores[0], val_scores[1], val_scores[2]))
         
         if val_scores[2] > best_val:
@@ -241,7 +221,7 @@ if __name__ == '__main__':
     params.word_hidden_dim = 600
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
-    params.batch_size = 25
+    params.batch_size = 5
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
@@ -258,7 +238,7 @@ if __name__ == '__main__':
     
     # load data
     filenames = {}
-    filenames["train"] = 'subset_1000.pkl'
+    filenames["train"] = 'subset.pkl'
     filenames["val"] = 'val_500.pkl'
     logging.info("- done.")
 
@@ -280,7 +260,7 @@ if __name__ == '__main__':
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 100)
+    train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 10)
 
 
 

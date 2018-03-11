@@ -3,7 +3,12 @@ import logging
 import os
 import shutil
 
+import numpy as np
 import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.utils.rnn
+from torch.autograd import Variable
 
 
 class Params():
@@ -134,3 +139,21 @@ def load_checkpoint(checkpoint, model, optimizer=None):
         optimizer.load_state_dict(checkpoint['optim_dict'])
 
     return checkpoint
+
+def unscramble(output, lengths, original_indices, batch_size, cuda = False):
+    """
+    Takes the output from the model, the lengths, and original_indices, and batch size.
+    Unscrambles the data, which had been sorted to make pack_padded_sequence work. 
+    Returns the unsscrambled and unpadded outputs. 
+    """
+    final_ids = (Variable(torch.from_numpy(np.array(lengths) - 1))).view(-1,1).expand(output.size(1),output.size(2)).unsqueeze(0)
+    if cuda:
+        final_ids = final_ids.cuda()
+    final_outputs = output.gather(0, final_ids).squeeze()#.unsqueeze(0)
+
+    mapping = original_indices.view(-1,1).expand(batch_size, output.size(2))
+    if cuda:
+        mapping = mapping.cuda()
+    unscrambled_outputs = final_outputs.gather(0, Variable(mapping))
+
+    return unscrambled_outputs
