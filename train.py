@@ -15,6 +15,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.utils.rnn
 #from tqdm import trange
 
 import utils
@@ -23,6 +24,8 @@ import data_prep
 from torch.autograd import Variable
 import pickle
 import math
+
+from datetime import datetime
 
 from valid import validate
 
@@ -35,16 +38,20 @@ parser.add_argument('--restore_file', default=None,
                     training")  # 'best' or 'train'
 
 
-def unscramble(output, lengths, original_indices, batch_size):
+def unscramble(output, lengths, original_indices, batch_size, cuda = False):
     """
     Takes the output from the model, the lengths, and original_indices, and batch size.
     Unscrambles the data, which had been sorted to make pack_padded_sequence work. 
     Returns the unsscrambled and unpadded outputs. 
     """
     final_ids = (Variable(torch.from_numpy(np.array(lengths) - 1))).view(-1,1).expand(output.size(1),output.size(2)).unsqueeze(0)
+    if cuda:
+        final_ids = final_ids.cuda()
     final_outputs = output.gather(0, final_ids).squeeze()#.unsqueeze(0)
 
     mapping = original_indices.view(-1,1).expand(batch_size, output.size(2))
+    if cuda:
+        mapping = mapping.cuda()
     unscrambled_outputs = final_outputs.gather(0, Variable(mapping))
 
     return unscrambled_outputs
@@ -96,16 +103,17 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
 
     batch_size = params.batch_size
     num_batches = min(num_triplets_word, num_triplets_vid) // batch_size
+
+    total_loss = 0
     
     #Iterate through all batches except the incomplete one.
     for batch_num in range(num_batches):
-        print(batch_num+1)
         for anchor_type in [True, False]:
             batch, indices = dataSet.get_batch(batch_size, anchor_is_phrase = anchor_type)
 
-            anchor_batch = batch[0].cuda() if params.cuda else batch[0]
-            positive_batch = batch[1].cuda() if params.cuda else batch[1]
-            negative_batch = batch[2].cuda() if params.cuda else batch[2]
+            anchor_batch =  batch[0]
+            positive_batch = batch[1]
+            negative_batch = batch[2]
 
             anchor_indices = indices[0]
             positive_indices = indices[1]
@@ -128,19 +136,13 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             negative_output, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
 
             #Unscramble output, and unpad
-            anchor_unscrambled = unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size)
-            positive_unscrambled = unscramble(positive_output, positive_lengths, positive_indices, batch_size)
-            negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size)
-
-            if params.cuda:
-                anchor_unscrambled = anchor_unscrambled.cuda()
-                positive_unscrambled = anchor_unscrambled.cuda()
-                negative_unscrambled = anchor_unscrambled.cuda()
+            anchor_unscrambled = unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size, cuda = params.cuda)
+            positive_unscrambled = unscramble(positive_output, positive_lengths, positive_indices, batch_size, cuda = params.cuda)
+            negative_unscrambled = unscramble(negative_output, negative_lengths, negative_indices, batch_size, cuda = params.cuda)
 
             #Compute loss over the batch
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
 
-            print("Loss", loss.data)
             loss_var = loss.data
 
             # clear previous gradients, compute gradients of all variables wrt loss
@@ -153,7 +155,9 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             word_optimizer.step()
             vid_optimizer.step()
 
-    return loss_var
+            total_loss += loss.data
+
+    return total_loss
 
 
 def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is_phrase = True, subset_size = 50):
@@ -185,30 +189,41 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
 
     #Load train dataset
     full_dataset = pickle.load( open( train_filename, "rb" ) )
-    val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = anchor_is_phrase)
+    val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
     tuple_list = full_dataset.items()
     datasets = []
     for i in range(math.floor(len(tuple_list)/subset_size)):
-        datasets.append(data_prep.Dataset(data = list(tuple_list)[subset_size*i:(i+1)*subset_size]))
+        datasets.append(data_prep.Dataset(data = list(tuple_list)[subset_size*i:(i+1)*subset_size], cuda = params.cuda))
 
     train_losses = []
+    best_val = float("-inf")
     #Train
+    start_time = datetime.now()
     for epoch in range(params.num_epochs):
+        is_best = False
+        print("Starting epoch: {}. Time elapsed: {}".format(epoch, str(datetime.now()-start_time)))
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         for dataset in datasets:
-            print('New subepoch')
+            #print('New subepoch')
             train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params)
             train_losses.append(train_loss)
             dataset.reset_counter()
+
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
         val_scores = validate(word_model, vid_model, val_dataset)
+        print("Train Loss: {}, Val Scores: Vid good: {} Word good: {} Total good {}".format(sum(train_losses)/len(train_losses), val_scores[0], val_scores[1], val_scores[2]))
+        
+        if val_scores[2] > best_val:
+            best_val = val_scores[2]
+            is_best = True
+
         utils.save_checkpoint({'epoch': epoch +1,
                                 'word_state_dict': word_model.state_dict(),
                                 'vid_state_dict': vid_model.state_dict(),
                                 'word_optim_dict': word_optimizer.state_dict(),
                                 'vid_optim_dict': vid_optimizer.state_dict(),
                                 'val_scores': val_scores,
-                                'train_losses': train_losses},
+                                'train_losses': train_losses}, is_best =is_best,
                                 checkpoint="weights_and_val")
     
 
@@ -216,7 +231,7 @@ if __name__ == '__main__':
 
     # Load the parameters from json file
     args = parser.parse_args()
-    args.model_dir = '.'
+    args.model_dir = '.' 
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
@@ -226,7 +241,7 @@ if __name__ == '__main__':
     params.word_hidden_dim = 600
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
-    params.batch_size = 50
+    params.batch_size = 25
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
@@ -264,7 +279,6 @@ if __name__ == '__main__':
     loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin = 0.2)
 
     # Train the model
-    print(params.cuda)
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 100)
 

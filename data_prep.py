@@ -7,7 +7,7 @@ import pickle
 
 class Dataset():
 
-    def __init__(self, filename = None, anchor_is_phrase = True, data = None):
+    def __init__(self, filename = None, anchor_is_phrase = True, data = None, cuda = False):
         if filename != None:
             self.pairs_dict = pickle.load( open( filename, "rb" ) )
         elif data != None:
@@ -15,6 +15,7 @@ class Dataset():
 
         self.curr_index_word = 0
         self.curr_index_vid = 0
+        self.cuda = cuda
 
     def len(self):
         return len(self.triplets_caption)
@@ -153,7 +154,10 @@ class Dataset():
                     self.vids_backup = examples[0].clone()
 
             # Obnoxious pytorch thing
-            examples[example_type] = nn.utils.rnn.pack_padded_sequence(examples[example_type], list(lengths[example_type]))
+            if self.cuda:
+                example[example_type] = nn.utils.rnn.pack_padded_sequence(examples[example_type].cuda(), list(lengths[example_type]))
+            else:
+                examples[example_type] = nn.utils.rnn.pack_padded_sequence(examples[example_type], list(lengths[example_type]))
 
         return examples, indices
 
