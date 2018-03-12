@@ -12,7 +12,7 @@ import os
 
 import logging
 import numpy as np
-import torch
+import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.utils.rnn
@@ -80,17 +80,19 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda = params.cuda)
     video_unscrambled = utils.unscramble(video_output, video_lengths, video_indices, len(word_indices), cuda = params.cuda)
 
-    num_triplets_word, num_triplets_vid = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),(word_lengths, video_lengths))
-
     batch_size = params.batch_size
-    num_batches = min(num_triplets_word, num_triplets_vid) // batch_size
+    num_batches = len(word_lengths) // batch_size
 
     total_loss = 0
     
     #Iterate through all batches except the incomplete one.
     for batch_num in range(num_batches):
-        for anchor_type in [True, False]:
-            batch, indices = dataSet.get_batch(batch_size, anchor_is_phrase = anchor_type)
+        start = batch_num * batch_size
+        end = (batch_num + 1) * batch_size
+        batches, idx = dataSet.mine_triplets_all((word_unscrambled[start:end], video_unscrambled[start:end]),
+                                                                        (word_lengths[start:end], video_lengths[start:end]))
+        for anchor_type in [0, 1]:
+            batch, indices = batches[anchor_type], idx[anchor_type]
 
             anchor_batch =  batch[0]
             positive_batch = batch[1]
@@ -123,8 +125,6 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
 
             #Compute loss over the batch
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
-
-            loss_var = loss.data
 
             # clear previous gradients, compute gradients of all variables wrt loss
             vid_optimizer.zero_grad()
@@ -205,7 +205,15 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'val_scores': val_scores,
                                 'train_losses': train_losses}, is_best =is_best,
                                 checkpoint="weights_and_val")
-    
+
+def triplet_loss_all(triplets, margin=1.0):
+    triplets = triplets.cuda()
+
+    ap_distances = (triplets[:, 0] - triplets[:, 1]).pow(2).sum(1).pow(.5) #remove square root?
+    an_distances = (triplets[:, 0] - triplets[:, 2]).pow(2).sum(1).pow(.5)
+    losses = F.relu(ap_distances - an_distances + margin)
+
+    return losses.mean()
 
 if __name__ == '__main__':
 
@@ -256,11 +264,9 @@ if __name__ == '__main__':
     optimizers["vid"] = vid_optimizer
     
     # fetch loss function and metrics
-    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin = 0.2)
+    loss_fn = triplet_loss_all(margin=0.2)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
     train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 10)
-
-
 
