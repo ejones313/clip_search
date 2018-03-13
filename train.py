@@ -57,7 +57,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     total_loss = 0
 
     #Iterate through all batches except the incomplete one.
-    for batch_num in range(1):
+    for batch_num in range(num_batches):
         start = batch_num * batch_size
         end = (batch_num + 1) * batch_size
 
@@ -115,9 +115,9 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
 
             #Compute loss over the batch
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
-            print(loss)
             print('Batch: %d' % batch_num)
-
+            print(loss)
+            
             # clear previous gradients, compute gradients of all variables wrt loss
             vid_optimizer.zero_grad()
             word_optimizer.zero_grad()
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     params.word_hidden_dim = 600
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
-    params.batch_size = 128
+    params.batch_size = 64
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
@@ -241,7 +241,7 @@ if __name__ == '__main__':
 
     # load data
     filenames = {}
-    filenames["train"] = 'subset.pkl'
+    filenames["train"] = 'train_1000.pkl'
     filenames["val"] = 'val_500.pkl'
     logging.info("- done.")
 
