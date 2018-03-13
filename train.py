@@ -79,6 +79,11 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         video_unscrambled = utils.unscramble(video_output, video_lengths, video_indices, len(word_indices),
                                              cuda=params.cuda)
 
+        # Normalize outputs
+        anchor_unscrambled = torch.nn.functional.normalize(anchor_unscrambled, p = 2, dim = 1)
+        positive_unscrambled = torch.nn.functional.normalize(positive_unscrambled, p = 2, dim = 1)
+        negative_unscrambled = torch.nn.functional.normalize(negative_unscrambled, p = 2, dim = 1)
+
         batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
                                                                         (word_lengths, video_lengths), batch_size)
         for anchor_type in [0, 1]:
@@ -109,9 +114,9 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             negative_output, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
 
             #Unscramble output, and unpad
-            anchor_unscrambled = utils.unscramble(anchor_output, anchor_lengths, anchor_indices, batch_size, cuda = params.cuda)
-            positive_unscrambled = utils.unscramble(positive_output, positive_lengths, positive_indices, batch_size, cuda = params.cuda)
-            negative_unscrambled = utils.unscramble(negative_output, negative_lengths, negative_indices, batch_size, cuda = params.cuda)
+            anchor_unscrambled = utils.unscramble(anchor_output, anchor_lengths, anchor_indices, anchor_output.shape[1], cuda = params.cuda)
+            positive_unscrambled = utils.unscramble(positive_output, positive_lengths, positive_indices, positive_output.shape[1], cuda = params.cuda)
+            negative_unscrambled = utils.unscramble(negative_output, negative_lengths, negative_indices, negative_output.shape[1], cuda = params.cuda)
 
             #Compute loss over the batch
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
