@@ -86,7 +86,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     total_loss = 0
     
     #Iterate through all batches except the incomplete one.
-    for batch_num in range(num_batches):
+    for batch_num in range(1):
         start = batch_num * batch_size
         end = (batch_num + 1) * batch_size
         batches, idx = dataSet.mine_triplets_all((word_unscrambled[start:end], video_unscrambled[start:end]),
@@ -184,14 +184,25 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         is_best = False
         print("Starting epoch: {}. Time elapsed: {}".format(epoch, str(datetime.now()-start_time)))
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+<<<<<<< HEAD
+        train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)
+        train_losses.append(train_loss)
+        things, indices = train_dataset.get_pairs(0, 1000)
+        train_scores = validate(word_model, vid_model, things, indices, cuda = params.cuda, top_perc=10)
+=======
         for dataset in datasets:
             train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params)
             train_losses.append(train_loss)
             dataset.reset_counter()
+>>>>>>> parent of 813e224... Debugged stuff
 
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
-        val_scores = validate(word_model, vid_model, val_dataset, cuda = params.cuda)
-        print("Train Loss: {}, Val Scores: Vid good: {} Word good: {} Total good {}".format(sum(train_losses)/len(train_losses), val_scores[0], val_scores[1], val_scores[2]))
+        things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
+        val_scores = validate(word_model, vid_model, things, indices, cuda = params.cuda, top_perc=10)
+        print(
+            "Train Loss: {}, Train Scores: Vid good: {} word good: {} Total good: {} Val Scores: Vid good: {} Word good: {} Total good {}".format(
+                sum(train_losses) / len(train_losses), train_scores[0], train_scores[1], train_scores[2], val_scores[0],
+                val_scores[1], val_scores[2]))
         
         if val_scores[2] > best_val:
             best_val = val_scores[2]
@@ -202,6 +213,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'vid_state_dict': vid_model.state_dict(),
                                 'word_optim_dict': word_optimizer.state_dict(),
                                 'vid_optim_dict': vid_optimizer.state_dict(),
+                                'train_scores': train_scores,
                                 'val_scores': val_scores,
                                 'train_losses': train_losses}, is_best =is_best,
                                 checkpoint="weights_and_val")

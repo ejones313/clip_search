@@ -9,12 +9,16 @@ import utils
 import math
 
 
-def validate(word_model, vid_model, val_data, top_perc = 20, cuda = False):
+def validate(word_model, vid_model, things, indices, top_perc = 20, cuda = False):
     vid_model.eval()
     word_model.eval()
 
     #Fix get_dataset to return not tuples.
+<<<<<<< HEAD
+
+=======
     things, indices = val_data.get_dataset()
+>>>>>>> parent of 813e224... Debugged stuff
     words, vids = things
     word_indices, vid_indices = indices
     vid_output = vid_model(vids)
