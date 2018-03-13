@@ -22,8 +22,12 @@ def validate(word_model, vid_model, things, indices, top_perc = 20, cuda = False
 
     word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
     vid_output, vid_lengths = nn.utils.rnn.pad_packed_sequence(vid_output)
-    word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.numpy()
-    vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.numpy()
+    if not cuda:
+        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.numpy()
+        vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.numpy()
+    else:
+        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.cuda().numpy()
+        vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.cuda().numpy()
 
     word_norm_scale = np.linalg.inv(np.diag(np.linalg.norm(word_unscrambled, axis=1)))
     vid_norm_scale = np.linalg.inv(np.diag(np.linalg.norm(vid_unscrambled, axis=1)))

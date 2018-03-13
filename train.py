@@ -174,7 +174,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)
         train_losses.append(train_loss)
-        things, indices = train_dataset.get_pairs(0, 1000)
+        things, indices = train_dataset.get_pairs(0, min(1000, train_dataset.pairs_len()))
         train_scores = validate(word_model, vid_model, things, indices, cuda = params.cuda, top_perc=10)
 
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
@@ -224,7 +224,8 @@ if __name__ == '__main__':
     params.word_hidden_dim = 600
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
-    params.batch_size = 64
+    params.batch_size = 16
+    params.num_epochs = 100
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
@@ -241,8 +242,8 @@ if __name__ == '__main__':
 
     # load data
     filenames = {}
-    filenames["train"] = 'train_1000.pkl'
-    filenames["val"] = 'val_500.pkl'
+    filenames["train"] = 'train_16.pkl'
+    filenames["val"] = 'train_16.pkl'
     logging.info("- done.")
 
     # Define the models and optimizers
