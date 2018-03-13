@@ -11,19 +11,13 @@ import argparse
 import os
 
 import logging
-import numpy as np
-import torch.nn.functional as F
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.utils.rnn
-#from tqdm import trange
 
 import utils
 import net
 import data_prep
-from torch.autograd import Variable
-import pickle
-import math
 
 from datetime import datetime
 
@@ -52,45 +46,41 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     """
 
     # set model to training mode.
-    loss_var = 0
     word_model.train()
     vid_model.train()
     word_model.zero_grad()
     vid_model.zero_grad()
 
-    #Calculate number of batches
-    #batch_size = params.batch_size
-    #dataset_size = len(dataSet)
-    #num_batches = dataset_size // batch_size
-
-    #
-    packed_dataset, indices = dataSet.get_dataset()
-    words = packed_dataset[0]
-    vids = packed_dataset[1]
-    word_indices = indices[0]
-    video_indices = indices[1]
-    word_output = word_model(words)
-    video_output = vid_model(vids)
-
-    #Undo pack_padded_sequence
-    word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
-    video_output, video_lengths = nn.utils.rnn.pad_packed_sequence(video_output)
-
-    #Unscramble output, and unpad
-    word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda = params.cuda)
-    video_unscrambled = utils.unscramble(video_output, video_lengths, video_indices, len(word_indices), cuda = params.cuda)
-
     batch_size = params.batch_size
-    num_batches = len(word_lengths) // batch_size
+    num_batches = dataSet.pairs_len() // batch_size
 
     total_loss = 0
-    
+
     #Iterate through all batches except the incomplete one.
     for batch_num in range(1):
         start = batch_num * batch_size
         end = (batch_num + 1) * batch_size
-        batches, idx = dataSet.mine_triplets_all((word_unscrambled[start:end], video_unscrambled[start:end]),
-                                                                        (word_lengths[start:end], video_lengths[start:end]))
+
+        packed_dataset, indices = dataSet.get_pairs(start, end)
+        words = packed_dataset[0]
+        vids = packed_dataset[1]
+        word_indices = indices[0]
+        video_indices = indices[1]
+        word_output = word_model(words)
+        video_output = vid_model(vids)
+
+        # Undo pack_padded_sequence
+        word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
+        video_output, video_lengths = nn.utils.rnn.pad_packed_sequence(video_output)
+
+        # Unscramble output, and unpad
+        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices),
+                                            cuda=params.cuda)
+        video_unscrambled = utils.unscramble(video_output, video_lengths, video_indices, len(word_indices),
+                                             cuda=params.cuda)
+
+        batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
+                                                                        (word_lengths, video_lengths), batch_size)
         for anchor_type in [0, 1]:
             batch, indices = batches[anchor_type], idx[anchor_type]
 
@@ -125,6 +115,8 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
 
             #Compute loss over the batch
             loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
+            print(loss)
+            print('Batch: %d' % batch_num)
 
             # clear previous gradients, compute gradients of all variables wrt loss
             vid_optimizer.zero_grad()
@@ -141,7 +133,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
     return total_loss
 
 
-def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is_phrase = True, subset_size = 50):
+def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is_phrase = True):
     """Train the model over many epochs
     Args:
         word_model: (torch.nn.Module) the LSTM for word embeddings
@@ -159,7 +151,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
     #    restore_path = os.path.join(args.model_dir, args.restore_file + '.pth.tar')
     #    logging.info("Restoring parameters from {}".format(restore_path))
     #    utils.load_checkpoint(restore_path, model, optimizer)
-    
+
     word_model = models["word"]
     vid_model = models["vid"]
     word_optimizer = optimizers["word"]
@@ -169,12 +161,8 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
 
 
     #Load train dataset
-    full_dataset = pickle.load( open( train_filename, "rb" ) )
+    train_dataset = data_prep.Dataset(filename = train_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
     val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
-    tuple_list = full_dataset.items()
-    datasets = []
-    for i in range(math.floor(len(tuple_list)/subset_size)):
-        datasets.append(data_prep.Dataset(data = list(tuple_list)[subset_size*i:(i+1)*subset_size], cuda = params.cuda))
 
     train_losses = []
     best_val = float("-inf")
@@ -184,17 +172,10 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         is_best = False
         print("Starting epoch: {}. Time elapsed: {}".format(epoch, str(datetime.now()-start_time)))
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
-<<<<<<< HEAD
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)
         train_losses.append(train_loss)
         things, indices = train_dataset.get_pairs(0, 1000)
         train_scores = validate(word_model, vid_model, things, indices, cuda = params.cuda, top_perc=10)
-=======
-        for dataset in datasets:
-            train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataset, params)
-            train_losses.append(train_loss)
-            dataset.reset_counter()
->>>>>>> parent of 813e224... Debugged stuff
 
         # SAVE MODEL PARAMETERS AND VALIDATION PERFORMANCE
         things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
@@ -203,7 +184,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
             "Train Loss: {}, Train Scores: Vid good: {} word good: {} Total good: {} Val Scores: Vid good: {} Word good: {} Total good {}".format(
                 sum(train_losses) / len(train_losses), train_scores[0], train_scores[1], train_scores[2], val_scores[0],
                 val_scores[1], val_scores[2]))
-        
+
         if val_scores[2] > best_val:
             best_val = val_scores[2]
             is_best = True
@@ -218,6 +199,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'train_losses': train_losses}, is_best =is_best,
                                 checkpoint="weights_and_val")
 
+'''
 def triplet_loss_all(triplets, margin=1.0):
     triplets = triplets.cuda()
 
@@ -226,12 +208,13 @@ def triplet_loss_all(triplets, margin=1.0):
     losses = F.relu(ap_distances - an_distances + margin)
 
     return losses.mean()
+'''
 
 if __name__ == '__main__':
 
     # Load the parameters from json file
     args = parser.parse_args()
-    args.model_dir = '.' 
+    args.model_dir = '.'
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
@@ -241,21 +224,21 @@ if __name__ == '__main__':
     params.word_hidden_dim = 600
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
-    params.batch_size = 5
+    params.batch_size = 128
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
-    
+
     # Set the random seed for reproducible experiments
     torch.manual_seed(230)
     if params.cuda: torch.cuda.manual_seed(230)
-        
+
     # Set the logger
     utils.set_logger(os.path.join(args.model_dir, 'train.log'))
 
     # Create the input data pipeline
     logging.info("Loading the datasets...")
-    
+
     # load data
     filenames = {}
     filenames["train"] = 'subset.pkl'
@@ -274,11 +257,10 @@ if __name__ == '__main__':
     vid_optimizer = optim.Adam(vid_model.parameters(), lr=params.learning_rate)
     optimizers["word"] = word_optimizer
     optimizers["vid"] = vid_optimizer
-    
+
     # fetch loss function and metrics
-    loss_fn = triplet_loss_all(margin=0.2)
+    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin=0.2)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(models, optimizers, filenames, loss_fn, params, subset_size = 10)
-
+    train_and_evaluate(models, optimizers, filenames, loss_fn, params)
