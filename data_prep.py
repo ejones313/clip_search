@@ -17,8 +17,11 @@ class Dataset():
         self.curr_index_vid = 0
         self.cuda = cuda
 
-    def len(self):
-        return len(self.triplets_caption)
+    def pairs_len(self):
+        return len(list(self.pairs_dict.values()))
+
+    def len(self, anchor_is_phrase):
+        return len(self.triplets_caption) if anchor_is_phrase else len(self.triplets_clips)
 
     def getitem(self, index, anchor_is_phrase):
         if anchor_is_phrase:
@@ -27,14 +30,7 @@ class Dataset():
             triplet = self.triplets_clips[index]
         return triplet
 
-    def reset_counter(self):
-        """
-        Resets every epoch, since we avoid the incomplete batch
-        """
-        self.curr_index_word = 0
-        self.curr_index_vid = 0
-
-    def retrieve_embeddings(self):
+    def retrieve_embeddings(self, start, end):
         embedding_tuples = list(self.pairs_dict.values())
 
         # Pairs of positive examples. First is videos, second is captions.
@@ -42,22 +38,22 @@ class Dataset():
         lengths = [[],[]]
         num_tuples = len(embedding_tuples)
 
-        for i in range(num_tuples):
+        for i in range(start, end):
             item = embedding_tuples[i]
             for type in range(2):
                 dataset[type].append(item[type])
                 lengths[type].append(item[type].shape[0])
 
         return dataset, lengths, num_tuples
-    
-    def get_dataset(self):
+
+    def get_pairs(self, start, end):
         #First is vids, second is captions in dataset
-        dataset, lengths, num_tuples = self.retrieve_embeddings()
+        dataset, lengths, num_tuples = self.retrieve_embeddings(start, end)
 
         # Sorted indices, first is vids, second is captions
         indices = [[],[]]
 
-        datasets, indices = self.sort_pad_sequence(2, num_tuples, dataset, lengths, indices, True)
+        datasets, indices = self.sort_pad_sequence(2, end - start, dataset, lengths, indices, True)
 
         return (dataset[1], dataset[0]), (indices[1], indices[0])
 
@@ -69,7 +65,7 @@ class Dataset():
 
         #Gets triplets, startaing at the first unused index. Num triplets
         #is batchsize.
-        for i in range(self.len()):
+        for i in range(self.len(anchor_is_phrase)):
             item = self.getitem(i, anchor_is_phrase)
             if anchor_is_phrase:
                 item_lengths = self.triplets_caption_lengths[i]
@@ -83,12 +79,12 @@ class Dataset():
 
         return examples, lengths
 
-    def process_triplets(self, anchor_is_phrase):
+    def process_triplets(self, anchor_is_phrase, num):
         """
         Returns two tuples. The first is the processed anchors, positives, and negatives
         Elements within anchors, positives, and negatives are padded (for pytorch, using packed padded sequences). Basically just a
-        lot of pytorch jargon to get a padded batch for model input. The second tuple contains mappings 
-        back to the original indices (gets sorted in decreasing size), for use later. 
+        lot of pytorch jargon to get a padded batch for model input. The second tuple contains mappings
+        back to the original indices (gets sorted in decreasing size), for use later.
         """
 
         # APN indices for the sorted sequences. First is A, second is P, third is N.
@@ -96,7 +92,13 @@ class Dataset():
 
         examples, lengths = self.retrieve_triples(anchor_is_phrase)
 
-        examples, indices = self.sort_pad_sequence(3, self.len(), examples, lengths, indices, False)
+        trunc_examples = [[],[],[]]
+        trunc_lengths = [[],[],[]]
+        for i in range(3):
+            trunc_examples[i] = examples[i][0:num]
+            trunc_lengths[i] = lengths[i][0:num]
+
+        examples, indices = self.sort_pad_sequence(3, num, trunc_examples, trunc_lengths, indices, False)#self.len(anchor_is_phrase)
 
         return examples, indices
 
@@ -180,9 +182,7 @@ class Dataset():
         self.triplets_caption_lengths = lengths[0]
         self.triplets_clips_lengths = lengths[1]
 
-    def mine_triplets_all(self, embedding_tuples, lengths_tuple):
-        # DON'T THINK THIS IS CORRECTLY MAKING THE VIDEO ANCHOR TRIPLETS RIGHT NOW
-
+    def mine_triplets_all(self, embedding_tuples, lengths_tuple, num):
         triplets = [[],[]]
         lengths = [[],[]]
 
@@ -209,9 +209,13 @@ class Dataset():
                         if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding, margin = 0.2) > 0:
                             triplets[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
                             lengths[anchor_type].append((lengths_tuple[anchor_type][index], lengths_tuple[1-anchor_type][index], lengths_tuple[1-anchor_type][neg_index]))
-                            
+
                         anchor, positive, anchor_embedding, positive_embedding = self.swap(anchor, positive, anchor_embedding, positive_embedding)
+
 
         self.save_triplets(triplets, lengths)
 
-        return self.process_triplets(True), self.process_triplets(False)
+        caption = self.process_triplets(True, num)
+        clip = self.process_triplets(False, num)
+
+        return (clip[0], caption[0]), (clip[1], caption[1])
