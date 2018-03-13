@@ -14,6 +14,7 @@ import logging
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.utils.rnn
+from torch.autograd import Variable
 
 import utils
 import net
@@ -79,13 +80,10 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         video_unscrambled = utils.unscramble(video_output, video_lengths, video_indices, len(word_indices),
                                              cuda=params.cuda)
 
-        # Normalize outputs
-        anchor_unscrambled = torch.nn.functional.normalize(anchor_unscrambled, p = 2, dim = 1)
-        positive_unscrambled = torch.nn.functional.normalize(positive_unscrambled, p = 2, dim = 1)
-        negative_unscrambled = torch.nn.functional.normalize(negative_unscrambled, p = 2, dim = 1)
 
         batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
                                                                         (word_lengths, video_lengths), batch_size)
+        loss = Variable(torch.FloatTensor([0]), requires_grad=True);
         for anchor_type in [0, 1]:
             batch, indices = batches[anchor_type], idx[anchor_type]
 
@@ -118,22 +116,28 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             positive_unscrambled = utils.unscramble(positive_output, positive_lengths, positive_indices, positive_output.shape[1], cuda = params.cuda)
             negative_unscrambled = utils.unscramble(negative_output, negative_lengths, negative_indices, negative_output.shape[1], cuda = params.cuda)
 
+             # Normalize outputs
+            anchor_unscrambled = torch.nn.functional.normalize(anchor_unscrambled, p = 2, dim = 1)
+            positive_unscrambled = torch.nn.functional.normalize(positive_unscrambled, p = 2, dim = 1)
+            negative_unscrambled = torch.nn.functional.normalize(negative_unscrambled, p = 2, dim = 1)
+
             #Compute loss over the batch
-            loss = loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
-            print('Batch: %d' % batch_num)
-            print(loss)
+            loss = loss + loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
+        
+        print('Batch: %d' % batch_num)
+        print(loss)
             
-            # clear previous gradients, compute gradients of all variables wrt loss
-            vid_optimizer.zero_grad()
-            word_optimizer.zero_grad()
-            #Backprop
-            loss.backward()
+        # clear previous gradients, compute gradients of all variables wrt loss
+        vid_optimizer.zero_grad()
+        word_optimizer.zero_grad()
+        #Backprop
+        loss.backward()
 
-            # performs updates using calculated gradients
-            word_optimizer.step()
-            vid_optimizer.step()
+        # performs updates using calculated gradients
+        word_optimizer.step()
+        vid_optimizer.step()
 
-            total_loss += loss.data
+        total_loss += loss.data
 
     return total_loss
 
@@ -169,7 +173,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
     train_dataset = data_prep.Dataset(filename = train_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
     val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
 
-    train_losses = []
+    #train_losses = []
     best_val = float("-inf")
     #Train
     start_time = datetime.now()
@@ -178,7 +182,6 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         print("Starting epoch: {}. Time elapsed: {}".format(epoch, str(datetime.now()-start_time)))
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)
-        train_losses.append(train_loss)
         things, indices = train_dataset.get_pairs(0, min(1000, train_dataset.pairs_len()))
         train_scores = validate(word_model, vid_model, things, indices, cuda = params.cuda, top_perc=10)
 
@@ -187,7 +190,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         val_scores = validate(word_model, vid_model, things, indices, cuda = params.cuda, top_perc=10)
         print(
             "Train Loss: {}, Train Scores: Vid good: {} word good: {} Total good: {} Val Scores: Vid good: {} Word good: {} Total good {}".format(
-                sum(train_losses) / len(train_losses), train_scores[0], train_scores[1], train_scores[2], val_scores[0],
+                train_loss, train_scores[0], train_scores[1], train_scores[2], val_scores[0],
                 val_scores[1], val_scores[2]))
 
         if val_scores[2] > best_val:
@@ -201,7 +204,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'vid_optim_dict': vid_optimizer.state_dict(),
                                 'train_scores': train_scores,
                                 'val_scores': val_scores,
-                                'train_losses': train_losses}, is_best =is_best,
+                                'train_losses': train_loss}, is_best =is_best,
                                 checkpoint="weights_and_val")
 
 '''
@@ -230,7 +233,7 @@ if __name__ == '__main__':
     params.vid_embedding_dim = 500
     params.vid_hidden_dim = 600
     params.batch_size = 16
-    params.num_epochs = 100
+    params.num_epochs = 10
 
     # use GPU if available
     params.cuda = torch.cuda.is_available()
@@ -265,7 +268,7 @@ if __name__ == '__main__':
     optimizers["vid"] = vid_optimizer
 
     # fetch loss function and metrics
-    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin=0.2)
+    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin=2)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))

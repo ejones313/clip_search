@@ -34,6 +34,11 @@ def validate(word_model, vid_model, things, indices, top_perc = 20, cuda = False
     
     prod_matrix = word_norm_scale@word_unscrambled@vid_unscrambled.T@vid_norm_scale
 
+    '''print(prod_matrix[0,:])
+    for i in range(16):
+        print(cosine_similarity(word_unscrambled[0,:], vid_unscrambled[i,:]))
+    pause = input("wait")'''
+
     top_n = int(math.floor((top_perc/100)*prod_matrix.shape[0]))
 
     word_sort_tenser = np.sort(prod_matrix, axis = 1)
@@ -59,3 +64,7 @@ def validate(word_model, vid_model, things, indices, top_perc = 20, cuda = False
     precentage_total_good = (percentage_vid_good + percentage_word_good) / 2
 
     return percentage_word_good, percentage_vid_good, precentage_total_good
+
+
+'''def cosine_similarity(a,b):
+    return np.dot(a,b) / (np.linalg.norm(a) * np.linalg.norm(b))'''

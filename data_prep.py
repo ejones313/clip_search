@@ -95,10 +95,10 @@ class Dataset():
         trunc_examples = [[],[],[]]
         trunc_lengths = [[],[],[]]
         for i in range(3):
-            trunc_examples[i] = examples[i][0:num]
-            trunc_lengths[i] = lengths[i][0:num]
+            trunc_examples[i] = examples[i][0:self.len(anchor_is_phrase)]
+            trunc_lengths[i] = lengths[i][0:self.len(anchor_is_phrase)]
 
-        examples, indices = self.sort_pad_sequence(3, num, trunc_examples, trunc_lengths, indices, False)#self.len(anchor_is_phrase)
+        examples, indices = self.sort_pad_sequence(3, self.len(anchor_is_phrase), trunc_examples, trunc_lengths, indices, False)#self.len(anchor_is_phrase) num
 
         return examples, indices
 
