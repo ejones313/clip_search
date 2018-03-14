@@ -92,13 +92,16 @@ class Dataset():
 
         examples, lengths = self.retrieve_triples(anchor_is_phrase)
 
-        trunc_examples = [[],[],[]]
-        trunc_lengths = [[],[],[]]
-        for i in range(3):
-            trunc_examples[i] = examples[i][0:self.len(anchor_is_phrase)]
-            trunc_lengths[i] = lengths[i][0:self.len(anchor_is_phrase)]
+        if num > 0:
+            trunc_examples = [[],[],[]]
+            trunc_lengths = [[],[],[]]
+            for i in range(3):
+                trunc_examples[i] = examples[i][0:num]
+                trunc_lengths[i] = lengths[i][0:num]
 
-        examples, indices = self.sort_pad_sequence(3, self.len(anchor_is_phrase), trunc_examples, trunc_lengths, indices, False)#self.len(anchor_is_phrase) num
+            examples, indices = self.sort_pad_sequence(3, num, trunc_examples, trunc_lengths, indices, False)
+        else:
+            examples, indices = self.sort_pad_sequence(3, self.len(anchor_is_phrase), examples, lengths, indices, False)
 
         return examples, indices
 
@@ -206,7 +209,7 @@ class Dataset():
                         negative = inputs[anchor_type][:,neg_index,:]
                         negative_embedding = outputs[anchor_type][neg_index]
 
-                        if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding, margin = 0.2) > 0:
+                        if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding, margin = 10) > 0:
                             triplets[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
                             lengths[anchor_type].append((lengths_tuple[anchor_type][index], lengths_tuple[1-anchor_type][index], lengths_tuple[1-anchor_type][neg_index]))
 
