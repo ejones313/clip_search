@@ -9,6 +9,36 @@ import utils
 import math
 import data_prep
 
+def validate_L2_V2(word_model, vid_model, things, indices, cuda = False):
+    vid_model.eval()
+    word_model.eval()
+
+    #Fix get_dataset to return not tuples.
+
+    words, vids = things
+    word_indices, vid_indices = indices
+    vid_output = vid_model(vids)
+    word_output = word_model(words)
+
+    word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
+    vid_output, vid_lengths = nn.utils.rnn.pad_packed_sequence(vid_output)
+    if not cuda:
+        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.numpy()
+        vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.numpy()
+    else:
+        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.cpu().numpy()
+        vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.cpu().numpy()
+
+    dist_matrix = np.zeros((word_unscrambled.shape[0], word_unscrambled.shape[0]))
+    
+    for i in range(word_unscrambled.shape[0]):
+        dist_matrix[i,:] = np.linalg.norm(word_unscrambled[i,:] - vid_unscrambled, axis = 1, keepdims = True).T
+        
+    avg_prctile_pos = np.sum(dist_matrix < np.diag(dist_matrix))/(dist_matrix.shape[0]**2)
+    avg_dist_diff = np.mean((np.diag(dist_matrix) - (np.sum(dist_matrix, axis = 1) - np.diag(dist_matrix))/(dist_matrix.shape[0] - 1)))
+
+    return float(avg_prctile_pos), float(avg_dist_diff)
+
 def validate_L2_triplet(word_model, vid_model, things, indices, dataSet, margin, cuda = False):
     vid_model.eval()
     word_model.eval()

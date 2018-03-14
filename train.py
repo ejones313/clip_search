@@ -23,7 +23,7 @@ import data_prep
 
 from datetime import datetime
 
-from valid import validate_L2_triplet
+from valid import validate_L2_V2
 
 
 parser = argparse.ArgumentParser()
@@ -87,7 +87,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         #video_unscrambled = torch.nn.functional.normalize(video_unscrambled, p = 2, dim = 1)
 
         batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
-                                                                        (word_lengths, video_lengths), 2*batch_size, params.margin)
+                                                                        (word_lengths, video_lengths), -1, params.margin)
         if params.cuda:
             loss = Variable(torch.FloatTensor([0]).cuda(), requires_grad=True)
         else:
@@ -187,8 +187,8 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
     train_dataset = data_prep.Dataset(filename = train_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
     val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
 
-    best_val = float("inf")
-    best_frac_hard = -1
+    best_val = float("-inf")
+    best_dist_diff = -1
     #Train
     start_time = datetime.now()
     for epoch in range(params.num_epochs):
@@ -198,12 +198,12 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)[0]
 
         things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
-        val_loss, frac_hard = validate_L2_triplet(word_model, vid_model, things, indices, val_dataset, 1e-7, cuda = params.cuda)
-        print("Train Loss: {}, Val Loss: {}\n".format(train_loss, val_loss))
+        avg_prctile, dist_diff = validate_L2_V2(word_model, vid_model, things, indices, cuda = params.cuda)
+        print("Train Loss: {}, Val Scores: (Pos_prctile: {}, Pos_dist-Neg_dist: {})\n".format(train_loss, avg_prctile, dist_diff))
 
-        if val_loss < best_val:
-            best_val = val_loss
-            best_frac_hard = frac_hard
+        if avg_prctile > best_val:
+            best_val = avg_prctile
+            best_dist_diff = dist_diff
             is_best = True
 
         utils.save_checkpoint({'epoch': epoch +1,
@@ -211,12 +211,13 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'vid_state_dict': vid_model.state_dict(),
                                 'word_optim_dict': word_optimizer.state_dict(),
                                 'vid_optim_dict': vid_optimizer.state_dict(),
-                                'val_loss': val_loss,
+                                'val_avg_prctile': avg_prctile,
+                                'val_dist_diff': dist_diff,
                                 'train_loss': train_loss}, is_best =is_best,
                                 checkpoint="weights_and_val")
-    return(best_val, best_frac_hard)
+    return(best_val, best_dist_diff)
 
-def main(params):
+def main(params, args):
     # use GPU if available
     params.cuda = torch.cuda.is_available()
 
@@ -265,7 +266,7 @@ if __name__ == '__main__':
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
 
-    main(params)
+    main(params, args)
     
 
 
