@@ -9,7 +9,7 @@ import utils
 import math
 import data_prep
 
-def validate_L2_triplet(word_model, vid_model, things, indices, dataSet, cuda = False):
+def validate_L2_triplet(word_model, vid_model, things, indices, dataSet, margin, cuda = False):
     vid_model.eval()
     word_model.eval()
 
@@ -34,7 +34,7 @@ def validate_L2_triplet(word_model, vid_model, things, indices, dataSet, cuda = 
     #video_unscrambled = torch.nn.functional.normalize(video_unscrambled, p = 2, dim = 1)
 
     batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
-                                                                    (word_lengths, video_lengths), -1)
+                                                                    (word_lengths, video_lengths), -1, margin)
     batch, indices = batches[1], idx[1]
 
     anchor_batch =  batch[0]
@@ -62,12 +62,11 @@ def validate_L2_triplet(word_model, vid_model, things, indices, dataSet, cuda = 
     negative_unscrambled = utils.unscramble(negative_unpacked, negative_lengths, negative_indices, negative_unpacked.shape[1], cuda = cuda)
     
     #Compute loss over the batch
-    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin=10)
+    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin=margin)
     total_loss = anchor_unpacked.shape[1]*loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
     potential_triplets = len(word_indices)**2 - len(word_indices)
-    print(potential_triplets)
-    print(negative_unpacked.shape[1])
-    return(total_loss.data[0] / potential_triplets)
+    print("Total triplets:", potential_triplets,"    Positive distance triplets (validation):", negative_unpacked.shape[1])
+    return(total_loss.data[0] / potential_triplets, negative_unpacked.shape[1] / potential_triplets)
 
 def validate_L2(word_model, vid_model, things, indices, top_perc = 20, cuda = False):
     vid_model.eval()

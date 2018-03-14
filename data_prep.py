@@ -91,7 +91,9 @@ class Dataset():
         indices=[[],[],[]]
 
         examples, lengths = self.retrieve_triples(anchor_is_phrase)
-
+        if len(examples[0]) < num:
+            num = len(examples[0])
+            
         if num > 0:
             trunc_examples = [[],[],[]]
             trunc_lengths = [[],[],[]]
@@ -185,7 +187,7 @@ class Dataset():
         self.triplets_caption_lengths = lengths[0]
         self.triplets_clips_lengths = lengths[1]
 
-    def mine_triplets_all(self, embedding_tuples, lengths_tuple, num):
+    def mine_triplets_all(self, embedding_tuples, lengths_tuple, num, margin):
         triplets = [[],[]]
         lengths = [[],[]]
 
@@ -209,7 +211,7 @@ class Dataset():
                         negative = inputs[anchor_type][:,neg_index,:]
                         negative_embedding = outputs[anchor_type][neg_index]
 
-                        if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding, margin = 10) > 0:
+                        if self.triplet_loss(anchor_embedding, positive_embedding, negative_embedding, margin = margin) > 0:
                             triplets[anchor_type].append((anchor.squeeze(), positive.squeeze(), negative.squeeze()))
                             lengths[anchor_type].append((lengths_tuple[anchor_type][index], lengths_tuple[1-anchor_type][index], lengths_tuple[1-anchor_type][neg_index]))
 

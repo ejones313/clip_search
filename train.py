@@ -87,7 +87,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         #video_unscrambled = torch.nn.functional.normalize(video_unscrambled, p = 2, dim = 1)
 
         batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
-                                                                        (word_lengths, video_lengths), -1)
+                                                                        (word_lengths, video_lengths), 2*batch_size, params.margin)
         if params.cuda:
             loss = Variable(torch.FloatTensor([0]).cuda(), requires_grad=True)
         else:
@@ -125,7 +125,6 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             anchor_unscrambled = utils.unscramble(anchor_unpacked, anchor_lengths, anchor_indices, anchor_unpacked.shape[1], cuda = params.cuda)
             positive_unscrambled = utils.unscramble(positive_unpacked, positive_lengths, positive_indices, positive_unpacked.shape[1], cuda = params.cuda)
             negative_unscrambled = utils.unscramble(negative_unpacked, negative_lengths, negative_indices, negative_unpacked.shape[1], cuda = params.cuda)
-            print(anchor_unpacked.shape[1], positive_unpacked.shape[1], negative_unpacked.shape[1])
 
              # Normalize outputs
             #anchor_unscrambled = torch.nn.functional.normalize(anchor_unscrambled, p = 2, dim = 1)
@@ -137,47 +136,14 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         
         print('Batch: %d' % batch_num)
         print(loss.data[0])
+        print("Num hard triplets trained on:", anchor_unpacked.shape[1])
             
         # clear previous gradients, compute gradients of all variables wrt loss
         vid_optimizer.zero_grad()
         word_optimizer.zero_grad()
 
         #Backprop
-        '''grads = []
-
-        def store_hook(grad, grads):
-            grads.append(grad)
-
-        # norm(A - P) - norm(A - N) + margin
-        # -2(A-P)
-        # 2(A-N)
-        # 2(A-P) - 2(A-N)
-        #loss.register_hook(print)
-        #positive_unscrambled.register_hook(lambda x: store_hook(x, grads))
-        #negative_unscrambled.register_hook(lambda x: store_hook(x, grads))
-        #anchor_unscrambled.register_hook(lambda x: store_hook(x, grads))
-        anchor_unpacked.register_hook(output_hook_function2)
-        anchor_unscrambled.register_hook(output_hook_function2)
-        anchor_output.data.register_hook(output_hook_function2)
-
-        positive_unpacked.register_hook(output_hook_function2)
-        positive_unscrambled.register_hook(output_hook_function2)
-        positive_output.data.register_hook(output_hook_function2)
-
-        negative_unpacked.register_hook(output_hook_function2)
-        negative_unscrambled.register_hook(output_hook_function2)
-        negative_output.data.register_hook(output_hook_function2)
-        #word_params = list(word_model.parameters())
-        #vid_params = list(vid_model.parameters())'''
-
         loss.backward()     
-
-        '''
-        #for param in word_params:
-        #    print(param.grad)
-        #for param in vid_params:
-        #    print(param.grad)
-        pause = input("wait")'''
 
         # performs updates using calculated gradients
         word_optimizer.step()
@@ -186,22 +152,6 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         total_loss += loss.data
 
     return total_loss
-
-'''def output_hook_function2(grad):
-    print(torch.sum(grad))
-
-def output_hook_function(grad):
-
-    print("Orig_shape: ", grad.data.shape)
-
-    for i in range(grad.shape[1]):
-
-        print(torch.nonzero(torch.sum(grad[:,i,:], dim = 1)).data, end = ", ")
-
-        if i == grad.shape[0] - 1:
-            print("")
-
-    print("-"*20)'''
 
 
 
@@ -238,21 +188,22 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
     val_dataset = data_prep.Dataset(filename = val_filename, anchor_is_phrase = anchor_is_phrase, cuda = params.cuda)
 
     best_val = float("inf")
+    best_frac_hard = -1
     #Train
     start_time = datetime.now()
     for epoch in range(params.num_epochs):
         is_best = False
-        print("Starting epoch: {}. Time elapsed: {}".format(epoch, str(datetime.now()-start_time)))
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))
+        print("Starting epoch: {}. Time elapsed: {}".format(epoch+1, str(datetime.now()-start_time)))
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)[0]
 
-
         things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
-        val_loss = validate_L2_triplet(word_model, vid_model, things, indices, val_dataset, cuda = params.cuda)
+        val_loss, frac_hard = validate_L2_triplet(word_model, vid_model, things, indices, val_dataset, 1e-7, cuda = params.cuda)
         print("Train Loss: {}, Val Loss: {}\n".format(train_loss, val_loss))
 
         if val_loss < best_val:
             best_val = val_loss
+            best_frac_hard = frac_hard
             is_best = True
 
         utils.save_checkpoint({'epoch': epoch +1,
@@ -263,36 +214,9 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'val_loss': val_loss,
                                 'train_loss': train_loss}, is_best =is_best,
                                 checkpoint="weights_and_val")
+    return(best_val, best_frac_hard)
 
-'''
-def triplet_loss_all(triplets, margin=1.0):
-    triplets = triplets.cuda()
-
-    ap_distances = (triplets[:, 0] - triplets[:, 1]).pow(2).sum(1).pow(.5) #remove square root?
-    an_distances = (triplets[:, 0] - triplets[:, 2]).pow(2).sum(1).pow(.5)
-    losses = F.relu(ap_distances - an_distances + margin)
-
-    return losses.mean()
-'''
-
-
-if __name__ == '__main__':
-
-    # Load the parameters from json file
-    args = parser.parse_args()
-    args.model_dir = '.'
-    json_path = os.path.join(args.model_dir, 'params.json')
-    assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
-    params = utils.Params(json_path)
-
-    #Set LSTM hyperparameters
-    params.word_embedding_dim = 300
-    params.word_hidden_dim = 600
-    params.vid_embedding_dim = 500
-    params.vid_hidden_dim = 600
-    params.batch_size = 16
-    params.num_epochs = 20
-
+def main(params):
     # use GPU if available
     params.cuda = torch.cuda.is_available()
 
@@ -308,8 +232,8 @@ if __name__ == '__main__':
 
     # load data
     filenames = {}
-    filenames["train"] = 'train_16.pkl'
-    filenames["val"] = 'train_16.pkl'
+    filenames["train"] = params.train_file
+    filenames["val"] = params.val_file
     logging.info("- done.")
 
     # Define the models and optimizers
@@ -326,8 +250,87 @@ if __name__ == '__main__':
     optimizers["vid"] = vid_optimizer
 
     # fetch loss function and metrics
-    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin=10)
+    loss_fn = torch.nn.modules.loss.TripletMarginLoss(margin=params.margin)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(models, optimizers, filenames, loss_fn, params)
+    return(train_and_evaluate(models, optimizers, filenames, loss_fn, params))
+
+
+if __name__ == '__main__':
+    # Load the parameters from json file
+    args = parser.parse_args()
+    args.model_dir = '.'
+    json_path = os.path.join(args.model_dir, 'params.json')
+    assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
+    params = utils.Params(json_path)
+
+    main(params)
+    
+
+
+'''
+def triplet_loss_all(triplets, margin=1.0):
+    triplets = triplets.cuda()
+
+    ap_distances = (triplets[:, 0] - triplets[:, 1]).pow(2).sum(1).pow(.5) #remove square root?
+    an_distances = (triplets[:, 0] - triplets[:, 2]).pow(2).sum(1).pow(.5)
+    losses = F.relu(ap_distances - an_distances + margin)
+
+    return losses.mean()
+'''
+
+
+# Gradient checking code
+
+'''grads = []
+
+        def store_hook(grad, grads):
+            grads.append(grad)
+
+        # norm(A - P) - norm(A - N) + margin
+        # -2(A-P)
+        # 2(A-N)
+        # 2(A-P) - 2(A-N)
+        #loss.register_hook(print)
+        #positive_unscrambled.register_hook(lambda x: store_hook(x, grads))
+        #negative_unscrambled.register_hook(lambda x: store_hook(x, grads))
+        #anchor_unscrambled.register_hook(lambda x: store_hook(x, grads))
+        anchor_unpacked.register_hook(output_hook_function2)
+        anchor_unscrambled.register_hook(output_hook_function2)
+        anchor_output.data.register_hook(output_hook_function2)
+
+        positive_unpacked.register_hook(output_hook_function2)
+        positive_unscrambled.register_hook(output_hook_function2)
+        positive_output.data.register_hook(output_hook_function2)
+
+        negative_unpacked.register_hook(output_hook_function2)
+        negative_unscrambled.register_hook(output_hook_function2)
+        negative_output.data.register_hook(output_hook_function2)
+        #word_params = list(word_model.parameters())
+        #vid_params = list(vid_model.parameters())'''
+
+
+'''
+#for param in word_params:
+#    print(param.grad)
+#for param in vid_params:
+#    print(param.grad)
+pause = input("wait")'''
+
+
+'''def output_hook_function2(grad):
+print(torch.sum(grad))
+
+def output_hook_function(grad):
+
+print("Orig_shape: ", grad.data.shape)
+
+for i in range(grad.shape[1]):
+
+    print(torch.nonzero(torch.sum(grad[:,i,:], dim = 1)).data, end = ", ")
+
+    if i == grad.shape[0] - 1:
+        print("")
+
+print("-"*20)'''
