@@ -57,7 +57,7 @@ def validate_cosine(word_model, vid_model, things, indices, top_perc = 20, cuda 
 
     word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
     vid_output, vid_lengths = nn.utils.rnn.pad_packed_sequence(vid_output)
-    
+
     word_order = np.zeros(word_indices.shape)
     vid_order = np.zeros(vid_indices.shape)
     for i in range(word_indices.size()[0]):
@@ -73,7 +73,7 @@ def validate_cosine(word_model, vid_model, things, indices, top_perc = 20, cuda 
     
     prod_matrix = word_norm_scale@word_unscrambled@vid_unscrambled.T@vid_norm_scale
         
-    avg_prctile_pos = np.sum(prod_matrix.T > np.diag(prod_matrix))/(prod_matrix.shape[0]**2)
-    avg_dist_diff = np.mean((np.diag(prod_matrix) - (np.sum(prod_matrix, axis = 1) - np.diag(prod_matrix))/(prod_matrix.shape[0] - 1)))
+    avg_prctile_pos = np.sum(prod_matrix.T < np.diag(prod_matrix))/(prod_matrix.shape[0]**2)
+    avg_dist_diff = -1*np.mean((np.diag(prod_matrix) - (np.sum(prod_matrix, axis = 1) - np.diag(prod_matrix))/(prod_matrix.shape[0] - 1)))
 
     return float(avg_prctile_pos), float(avg_dist_diff)

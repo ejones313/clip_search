@@ -158,7 +158,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)[0]
 
         things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
-        avg_prctile, dist_diff = validate_L2(word_model, vid_model, things, indices, cuda = params.cuda)
+        avg_prctile, dist_diff = validate_cosine(word_model, vid_model, things, indices, cuda = params.cuda)
         print("Train Loss: {}, Val Scores: (Pos_prctile: {}, Pos_dist-Neg_dist: {})\n".format(train_loss, avg_prctile, dist_diff))
 
         if avg_prctile > best_val:
