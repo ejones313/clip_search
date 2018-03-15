@@ -88,62 +88,26 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         video_unscrambled = video_output[vid_order,:]
         word_lengths = np.array(word_lengths)[word_order.astype(int)].tolist()
         video_lengths = np.array(video_lengths)[vid_order.astype(int)].tolist()
-        batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
-                                                                        (word_lengths, video_lengths), -1, params.margin, word_order, vid_order)
 
         if params.cuda:
             loss = Variable(torch.FloatTensor([0]).cuda(), requires_grad=True)
         else:
             loss = Variable(torch.FloatTensor([0]), requires_grad=True)
 
-        #for anchor_type in [0, 1]:
-        for anchor_type in [1]:
-            batch, indices = batches[anchor_type], idx[anchor_type]
-
-            anchor_batch =  batch[0]
-            positive_batch = batch[1]
-            negative_batch = batch[2]
-
-            anchor_indices = indices[0]
-            positive_indices = indices[1]
-            negative_indices = indices[2]
-
-            # compute model output and loss, putting each component of the batch into the appropriate LSTM
-            if anchor_type:
-                anchor_output = word_model(anchor_batch)
-                positive_output = vid_model(positive_batch)
-                negative_output = vid_model(negative_batch)
-            else:
-                anchor_output = vid_model(anchor_batch)
-                positive_output = word_model(positive_batch)
-                negative_output = word_model(negative_batch)
-
-
-            #Undo pack_padded_sequence
-            anchor_unpacked, anchor_lengths = nn.utils.rnn.pad_packed_sequence(anchor_output)
-            positive_unpacked, positive_lengths = nn.utils.rnn.pad_packed_sequence(positive_output)
-            negative_unpacked, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
-
-            # Unscramble output
-            anchor_order = np.zeros(anchor_indices.shape)
-            positive_order = np.zeros(positive_indices.shape)
-            negative_order = np.zeros(negative_indices.shape)
-            for i in range(anchor_indices.size()[0]):
-                anchor_order[anchor_indices[i]] = i
-                positive_order[positive_indices[i]] = i
-                negative_order[negative_indices[i]] = i
-            anchor_unpacked = anchor_unpacked[np.array(anchor_lengths)-1, np.arange(anchor_unpacked.shape[1]), :]
-            positive_unpacked = positive_unpacked[np.array(positive_lengths)-1, np.arange(positive_unpacked.shape[1]), :]
-            negative_unpacked = negative_unpacked[np.array(negative_lengths)-1, np.arange(negative_unpacked.shape[1]), :]
-            anchor_unscrambled = anchor_unpacked[anchor_order,:]
-            positive_unscrambled = positive_unpacked[positive_order,:]
-            negative_unscrambled = negative_unpacked[negative_order,:]
-
-            loss = loss + loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
+        for triplet_type in range(1):    
+            for anchor_num in range(batch_size):
+                if triplet_type == 0:
+                    A = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
+                    P = torch.unsqueeze(video_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
+                    N = video_unscrambled
+                else:
+                    A = torch.unsqueeze(video_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
+                    P = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
+                    N = word_unscrambled
+                loss = loss + loss_fn(A,P,N)
         
         print('Batch: %d' % batch_num)
         print(loss.data[0])
-        print("Num hard triplets trained on:", anchor_unscrambled.shape[0])
             
         # clear previous gradients, compute gradients of all variables wrt loss
         vid_optimizer.zero_grad()
