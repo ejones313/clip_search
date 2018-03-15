@@ -76,18 +76,21 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
         video_output, video_lengths = nn.utils.rnn.pad_packed_sequence(video_output)
 
-        # Unscramble output, and unpad
-        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices),
-                                            cuda=params.cuda)
-        video_unscrambled = utils.unscramble(video_output, video_lengths, video_indices, len(word_indices),
-                                             cuda=params.cuda)
-
-        # Normalize
-        #word_unscrambled = torch.nn.functional.normalize(word_unscrambled, p = 2, dim = 1)
-        #video_unscrambled = torch.nn.functional.normalize(video_unscrambled, p = 2, dim = 1)
-
+        # Unscramble output
+        word_order = np.zeros(word_indices.shape)
+        vid_order = np.zeros(video_indices.shape)
+        for i in range(word_indices.size()[0]):
+            word_order[word_indices[i]] = i
+            vid_order[video_indices[i]] = i
+        word_output = word_output[np.array(word_lengths)-1, np.arange(word_output.shape[1]), :]
+        video_output = video_output[np.array(video_lengths)-1, np.arange(video_output.shape[1]), :]
+        word_unscrambled = word_output[word_order,:]
+        video_unscrambled = video_output[vid_order,:]
+        word_lengths = np.array(word_lengths)[word_order.astype(int)].tolist()
+        video_lengths = np.array(video_lengths)[vid_order.astype(int)].tolist()
         batches, idx = dataSet.mine_triplets_all((word_unscrambled, video_unscrambled),
-                                                                        (word_lengths, video_lengths), -1, params.margin)
+                                                                        (word_lengths, video_lengths), -1, params.margin, word_order, vid_order)
+
         if params.cuda:
             loss = Variable(torch.FloatTensor([0]).cuda(), requires_grad=True)
         else:
@@ -121,22 +124,26 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             positive_unpacked, positive_lengths = nn.utils.rnn.pad_packed_sequence(positive_output)
             negative_unpacked, negative_lengths = nn.utils.rnn.pad_packed_sequence(negative_output)
 
-            #Unscramble output, and unpad
-            anchor_unscrambled = utils.unscramble(anchor_unpacked, anchor_lengths, anchor_indices, anchor_unpacked.shape[1], cuda = params.cuda)
-            positive_unscrambled = utils.unscramble(positive_unpacked, positive_lengths, positive_indices, positive_unpacked.shape[1], cuda = params.cuda)
-            negative_unscrambled = utils.unscramble(negative_unpacked, negative_lengths, negative_indices, negative_unpacked.shape[1], cuda = params.cuda)
+            # Unscramble output
+            anchor_order = np.zeros(anchor_indices.shape)
+            positive_order = np.zeros(positive_indices.shape)
+            negative_order = np.zeros(negative_indices.shape)
+            for i in range(anchor_indices.size()[0]):
+                anchor_order[anchor_indices[i]] = i
+                positive_order[positive_indices[i]] = i
+                negative_order[negative_indices[i]] = i
+            anchor_unpacked = anchor_unpacked[np.array(anchor_lengths)-1, np.arange(anchor_unpacked.shape[1]), :]
+            positive_unpacked = positive_unpacked[np.array(positive_lengths)-1, np.arange(positive_unpacked.shape[1]), :]
+            negative_unpacked = negative_unpacked[np.array(negative_lengths)-1, np.arange(negative_unpacked.shape[1]), :]
+            anchor_unscrambled = anchor_unpacked[anchor_order,:]
+            positive_unscrambled = positive_unpacked[positive_order,:]
+            negative_unscrambled = negative_unpacked[negative_order,:]
 
-             # Normalize outputs
-            #anchor_unscrambled = torch.nn.functional.normalize(anchor_unscrambled, p = 2, dim = 1)
-            #positive_unscrambled = torch.nn.functional.normalize(positive_unscrambled, p = 2, dim = 1)
-            #negative_unscrambled = torch.nn.functional.normalize(negative_unscrambled, p = 2, dim = 1)
-
-            #Compute loss over the batch
             loss = loss + loss_fn(anchor_unscrambled, positive_unscrambled, negative_unscrambled)
         
         print('Batch: %d' % batch_num)
         print(loss.data[0])
-        print("Num hard triplets trained on:", anchor_unpacked.shape[1])
+        print("Num hard triplets trained on:", anchor_unscrambled.shape[0])
             
         # clear previous gradients, compute gradients of all variables wrt loss
         vid_optimizer.zero_grad()
@@ -335,3 +342,12 @@ for i in range(grad.shape[1]):
         print("")
 
 print("-"*20)'''
+
+# Normalize
+#word_unscrambled = torch.nn.functional.normalize(word_unscrambled, p = 2, dim = 1)
+#video_unscrambled = torch.nn.functional.normalize(video_unscrambled, p = 2, dim = 1)
+
+ # Normalize outputs
+#anchor_unscrambled = torch.nn.functional.normalize(anchor_unscrambled, p = 2, dim = 1)
+#positive_unscrambled = torch.nn.functional.normalize(positive_unscrambled, p = 2, dim = 1)
+#negative_unscrambled = torch.nn.functional.normalize(negative_unscrambled, p = 2, dim = 1)

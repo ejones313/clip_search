@@ -2,7 +2,7 @@
     "learning_rate": 1e-3,
     "batch_size": 16,
     "num_epochs": 40,
-    "margin": 0.05,
+    "margin": 0.1,
     "train_file": "train_16.pkl",
     "val_file": "train_16.pkl",
 

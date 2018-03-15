@@ -22,19 +22,23 @@ def validate_L2_V2(word_model, vid_model, things, indices, cuda = False):
 
     word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
     vid_output, vid_lengths = nn.utils.rnn.pad_packed_sequence(vid_output)
-    if not cuda:
-        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.numpy()
-        vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.numpy()
-    else:
-        word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.cpu().numpy()
-        vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.cpu().numpy()
+
+    word_order = np.zeros(word_indices.shape)
+    vid_order = np.zeros(vid_indices.shape)
+    for i in range(word_indices.size()[0]):
+        word_order[word_indices[i]] = i
+        vid_order[vid_indices[i]] = i
+    word_output = word_output[np.array(word_lengths)-1, np.arange(word_output.shape[1]), :]
+    vid_output = vid_output[np.array(vid_lengths)-1, np.arange(vid_output.shape[1]), :]
+    word_unscrambled = word_output[word_order,:].data.numpy()
+    vid_unscrambled = vid_output[vid_order,:].data.numpy()
 
     dist_matrix = np.zeros((word_unscrambled.shape[0], word_unscrambled.shape[0]))
     
     for i in range(word_unscrambled.shape[0]):
         dist_matrix[i,:] = np.linalg.norm(word_unscrambled[i,:] - vid_unscrambled, axis = 1, keepdims = True).T
         
-    avg_prctile_pos = np.sum(dist_matrix < np.diag(dist_matrix))/(dist_matrix.shape[0]**2)
+    avg_prctile_pos = np.sum(dist_matrix.T > np.diag(dist_matrix))/(dist_matrix.shape[0]**2)
     avg_dist_diff = np.mean((np.diag(dist_matrix) - (np.sum(dist_matrix, axis = 1) - np.diag(dist_matrix))/(dist_matrix.shape[0] - 1)))
 
     return float(avg_prctile_pos), float(avg_dist_diff)
@@ -199,3 +203,10 @@ def validate(word_model, vid_model, things, indices, top_perc = 20, cuda = False
 
 def cosine_similarity(a,b):
     return np.dot(a,b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+'''if not cuda:
+    word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.numpy()
+    vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.numpy()
+else:
+    word_unscrambled = utils.unscramble(word_output, word_lengths, word_indices, len(word_indices), cuda).data.cpu().numpy()
+    vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_indices, len(vid_indices), cuda).data.cpu().numpy()'''

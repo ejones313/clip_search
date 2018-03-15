@@ -76,7 +76,6 @@ class Dataset():
                 example = item[example_type]
                 examples[example_type].append(example)
                 lengths[example_type].append(item_lengths[example_type])
-
         return examples, lengths
 
     def process_triplets(self, anchor_is_phrase, num):
@@ -91,9 +90,10 @@ class Dataset():
         indices=[[],[],[]]
 
         examples, lengths = self.retrieve_triples(anchor_is_phrase)
+
         if len(examples[0]) < num:
             num = len(examples[0])
-            
+
         if num > 0:
             trunc_examples = [[],[],[]]
             trunc_lengths = [[],[],[]]
@@ -104,6 +104,7 @@ class Dataset():
             examples, indices = self.sort_pad_sequence(3, num, trunc_examples, trunc_lengths, indices, False)
         else:
             examples, indices = self.sort_pad_sequence(3, self.len(anchor_is_phrase), examples, lengths, indices, False)
+
 
         return examples, indices
 
@@ -123,7 +124,6 @@ class Dataset():
                 padded[0:length[i], i, 0:example[0].shape[1]] = var[0:length[i],:]
             else:
                 padded[0:length[i], i, 0:example[0].shape[1]] = var.data[0:length[i],:]
-
         return padded
 
     # Sorts variable length inputs and packs them into packedsequences.
@@ -131,7 +131,6 @@ class Dataset():
         for example_type in range(num_types):
             # For pytorch, sorts the components of the data tuples by the length of the sequence (will be unsorted correctly later)
             lengths[example_type], indices[example_type] = torch.sort(torch.IntTensor(lengths[example_type]), descending=True)
-
             padded = self.pad_sequences(batch_size, examples[example_type], lengths[example_type], indices[example_type], backup)
 
             # Convert to Variables
@@ -145,6 +144,7 @@ class Dataset():
                     self.words_backup = examples[1].clone()
                 elif example_type == 0:
                     self.vids_backup = examples[0].clone()
+
 
             # Obnoxious pytorch thing
             if self.cuda:
@@ -187,13 +187,14 @@ class Dataset():
         self.triplets_caption_lengths = lengths[0]
         self.triplets_clips_lengths = lengths[1]
 
-    def mine_triplets_all(self, embedding_tuples, lengths_tuple, num, margin):
+    def mine_triplets_all(self, embedding_tuples, lengths_tuple, num, margin, word_unscramble, vid_unscramble):
         triplets = [[],[]]
         lengths = [[],[]]
 
         #Tuples of inputs and outputs - First is clips, second is captions
-        inputs = (self.vids_backup, self.words_backup)
+        inputs = (self.vids_backup[:,vid_unscramble,:], self.words_backup[:,word_unscramble,:])
         outputs = (embedding_tuples[1], embedding_tuples[0])
+
 
         # Loop over captions
         for index in range(inputs[1].shape[1]):
@@ -217,9 +218,7 @@ class Dataset():
 
                         anchor, positive, anchor_embedding, positive_embedding = self.swap(anchor, positive, anchor_embedding, positive_embedding)
 
-
         self.save_triplets(triplets, lengths)
-
         caption = self.process_triplets(True, num)
         clip = self.process_triplets(False, num)
 
