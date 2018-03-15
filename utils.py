@@ -149,11 +149,8 @@ def unscramble(output, lengths, original_indices, batch_size, cuda = False):
     final_ids = (Variable(torch.from_numpy(np.array(lengths) - 1))).view(-1,1).expand(output.size(1),output.size(2)).unsqueeze(0)
     if cuda:
         final_ids = final_ids.cuda()
-    final_outputs = output.gather(0, final_ids).squeeze()#.unsqueeze(0)
+    final_outputs = output.gather(0, final_ids).squeeze()
 
-    mapping = original_indices.view(-1,1).expand(batch_size, output.size(2))
-    if cuda:
-        mapping = mapping.cuda()
-    unscrambled_outputs = final_outputs.gather(0, Variable(mapping))
+    unscrambled_outputs = final_outputs[original_indices]
 
     return unscrambled_outputs

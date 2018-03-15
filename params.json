@@ -5,9 +5,9 @@
     "margin": 0.1,
     "train_file": "train_16.pkl",
     "val_file": "train_16.pkl",
+    "reg_strength": 0,
 
-    "word_hidden_dim": 64,
-    "vid_hidden_dim": 64,
+    "hidden_dim": 64,
     "word_embedding_dim": 300,
     "vid_embedding_dim": 500,
     "save_summary_steps": 100

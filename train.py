@@ -77,24 +77,21 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         video_output, video_lengths = nn.utils.rnn.pad_packed_sequence(video_output)
 
         # Unscramble output
-        word_order = np.zeros(word_indices.shape)
-        vid_order = np.zeros(video_indices.shape)
+        word_order = torch.zeros(word_indices.shape).long()
+        vid_order = torch.zeros(video_indices.shape).long()
         for i in range(word_indices.size()[0]):
             word_order[word_indices[i]] = i
             vid_order[video_indices[i]] = i
-        word_output = word_output[np.array(word_lengths)-1, np.arange(word_output.shape[1]), :]
-        video_output = video_output[np.array(video_lengths)-1, np.arange(video_output.shape[1]), :]
-        word_unscrambled = word_output[word_order,:]
-        video_unscrambled = video_output[vid_order,:]
-        word_lengths = np.array(word_lengths)[word_order.astype(int)].tolist()
-        video_lengths = np.array(video_lengths)[vid_order.astype(int)].tolist()
+
+        word_unscrambled = utils.unscramble(word_output, word_lengths, word_order, batch_size, params.cuda)
+        video_unscrambled = utils.unscramble(video_output, video_lengths, vid_order, batch_size, params.cuda)
 
         if params.cuda:
             loss = Variable(torch.FloatTensor([0]).cuda(), requires_grad=True)
         else:
             loss = Variable(torch.FloatTensor([0]), requires_grad=True)
 
-        for triplet_type in range(1):    
+        for triplet_type in range(1):
             for anchor_num in range(batch_size):
                 if triplet_type == 0:
                     A = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
@@ -216,8 +213,8 @@ def main(params, args):
     models["vid"] = vid_model
 
     optimizers = {}
-    word_optimizer = optim.Adadelta(word_model.parameters())
-    vid_optimizer = optim.Adadelta(vid_model.parameters())
+    word_optimizer = optim.Adadelta(word_model.parameters(), lr = params.lr, weight_decay = params.reg_strength)
+    vid_optimizer = optim.Adadelta(vid_model.parameters(), lr = params.lr, weight_decay = params.reg_strength)
     optimizers["word"] = word_optimizer
     optimizers["vid"] = vid_optimizer
 
@@ -238,80 +235,3 @@ if __name__ == '__main__':
     params = utils.Params(json_path)
 
     main(params, args)
-    
-
-
-'''
-def triplet_loss_all(triplets, margin=1.0):
-    triplets = triplets.cuda()
-
-    ap_distances = (triplets[:, 0] - triplets[:, 1]).pow(2).sum(1).pow(.5) #remove square root?
-    an_distances = (triplets[:, 0] - triplets[:, 2]).pow(2).sum(1).pow(.5)
-    losses = F.relu(ap_distances - an_distances + margin)
-
-    return losses.mean()
-'''
-
-
-# Gradient checking code
-
-'''grads = []
-
-        def store_hook(grad, grads):
-            grads.append(grad)
-
-        # norm(A - P) - norm(A - N) + margin
-        # -2(A-P)
-        # 2(A-N)
-        # 2(A-P) - 2(A-N)
-        #loss.register_hook(print)
-        #positive_unscrambled.register_hook(lambda x: store_hook(x, grads))
-        #negative_unscrambled.register_hook(lambda x: store_hook(x, grads))
-        #anchor_unscrambled.register_hook(lambda x: store_hook(x, grads))
-        anchor_unpacked.register_hook(output_hook_function2)
-        anchor_unscrambled.register_hook(output_hook_function2)
-        anchor_output.data.register_hook(output_hook_function2)
-
-        positive_unpacked.register_hook(output_hook_function2)
-        positive_unscrambled.register_hook(output_hook_function2)
-        positive_output.data.register_hook(output_hook_function2)
-
-        negative_unpacked.register_hook(output_hook_function2)
-        negative_unscrambled.register_hook(output_hook_function2)
-        negative_output.data.register_hook(output_hook_function2)
-        #word_params = list(word_model.parameters())
-        #vid_params = list(vid_model.parameters())'''
-
-
-'''
-#for param in word_params:
-#    print(param.grad)
-#for param in vid_params:
-#    print(param.grad)
-pause = input("wait")'''
-
-
-'''def output_hook_function2(grad):
-print(torch.sum(grad))
-
-def output_hook_function(grad):
-
-print("Orig_shape: ", grad.data.shape)
-
-for i in range(grad.shape[1]):
-
-    print(torch.nonzero(torch.sum(grad[:,i,:], dim = 1)).data, end = ", ")
-
-    if i == grad.shape[0] - 1:
-        print("")
-
-print("-"*20)'''
-
-# Normalize
-#word_unscrambled = torch.nn.functional.normalize(word_unscrambled, p = 2, dim = 1)
-#video_unscrambled = torch.nn.functional.normalize(video_unscrambled, p = 2, dim = 1)
-
- # Normalize outputs
-#anchor_unscrambled = torch.nn.functional.normalize(anchor_unscrambled, p = 2, dim = 1)
-#positive_unscrambled = torch.nn.functional.normalize(positive_unscrambled, p = 2, dim = 1)
-#negative_unscrambled = torch.nn.functional.normalize(negative_unscrambled, p = 2, dim = 1)

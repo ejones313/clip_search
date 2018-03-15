@@ -22,26 +22,36 @@ def search():
     params.train_file = "train_1000.pkl"
     params.val_file = "val_500.pkl"
 
-    learning_rates = generate_values(10, -6, -1)
-    margins = generate_values(7, -4, 0)
+    learning_rates = generate_values(10, -5, 0.5)
+    margins = generate_values(6, -4, 0)
+    hidden_dims = [32, 64, 128, 256, 512]
+    reg_strengths = generate_values(9, -6, -2)
 
     best_val_prctile = float("-inf")
     best_val_dist_diff = -1
     opt_rate = 0
     opt_margin = 0
+    opt_hidden_dim = 0
+    opt_reg_strength = 0
     for rate in learning_rates:
         for margin in margins:
-            params.margin = float(margin)
-            params.learning_rate = float(rate)
+            for hidden_dim in hidden_dims:
+                for reg_strength in reg_strengths:
+                    params.margin = float(margin)
+                    params.learning_rate = float(rate)
+                    params.hidden_dim = hidden_dim
+                    params.reg_strength = float(reg_strength)
 
-            (avg_prctile, avg_dist_diff) = train.main(params, args)
-            if avg_prctile > best_val_oss:
-                opt_rate = rate
-                opt_margin = margin
-                best_val_prctile = avg_prctile
-                best_val_dist_diff = avg_dist_diff
+                    (avg_prctile, avg_dist_diff) = train.main(params, args)
+                    if avg_prctile > best_val_prctile:
+                        opt_rate = rate
+                        opt_margin = margin
+                        opt_hidden_dim = hidden_dim
+                        opt_reg_strength = reg_strength
+                        best_val_prctile = avg_prctile
+                        best_val_dist_diff = avg_dist_diff
 
-    print('Optimal Learning Rate: %f,\nOptimal Margin: %f' % (opt_rate, opt_margin))
+    print('Optimal Learning Rate: %f\nOptimal Margin: %f\nOptimal hidden_dim: %d\nOptimal Regularization: %f' % (opt_rate, opt_margin, opt_hidden_dim, opt_reg_strength))
 
 def generate_values(num, low, high):
     log_vals = np.random.rand(num)
