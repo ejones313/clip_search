@@ -245,8 +245,8 @@ def main(params, args):
     models["vid"] = vid_model
 
     optimizers = {}
-    word_optimizer = optim.Adam(word_model.parameters(), lr=params.learning_rate)
-    vid_optimizer = optim.Adam(vid_model.parameters(), lr=params.learning_rate)
+    word_optimizer = optim.Adadelta(word_model.parameters())
+    vid_optimizer = optim.Adadelta(vid_model.parameters())
     optimizers["word"] = word_optimizer
     optimizers["vid"] = vid_optimizer
 
