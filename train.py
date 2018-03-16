@@ -1,11 +1,5 @@
-"""Train the model"""
 
-"""
-QUESTIONS:
-    -Train: 10000, Val: 1000
-    -Downsampling
-    -When to regenerate triplets
-"""
+"""Train the model"""
 
 import argparse
 import os
@@ -23,7 +17,8 @@ import data_prep
 
 from datetime import datetime
 
-from valid import validate_L2_V2
+from valid import validate_L2
+from valid import validate_cosine
 
 
 parser = argparse.ArgumentParser()
@@ -91,7 +86,7 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         else:
             loss = Variable(torch.FloatTensor([0]), requires_grad=True)
 
-        for triplet_type in range(1):
+        for triplet_type in range(2):
             for anchor_num in range(batch_size):
                 if triplet_type == 0:
                     A = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).expand(batch_size, -1)
@@ -102,9 +97,6 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
                     P = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).expand(batch_size, -1)
                     N = word_unscrambled
                 loss = loss + loss_fn(A,P,N)
-        
-        print('Batch: %d' % batch_num)
-        print(loss.data[0])
             
         # clear previous gradients, compute gradients of all variables wrt loss
         vid_optimizer.zero_grad()
@@ -166,7 +158,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)[0]
 
         things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
-        avg_prctile, dist_diff = validate_L2_V2(word_model, vid_model, things, indices, cuda = params.cuda)
+        avg_prctile, dist_diff = validate_cosine(word_model, vid_model, things, indices, cuda = params.cuda)
         print("Train Loss: {}, Val Scores: (Pos_prctile: {}, Pos_dist-Neg_dist: {})\n".format(train_loss, avg_prctile, dist_diff))
 
         if avg_prctile > best_val:
@@ -213,8 +205,8 @@ def main(params, args):
     models["vid"] = vid_model
 
     optimizers = {}
-    word_optimizer = optim.Adadelta(word_model.parameters(), lr = params.lr, weight_decay = params.reg_strength)
-    vid_optimizer = optim.Adadelta(vid_model.parameters(), lr = params.lr, weight_decay = params.reg_strength)
+    word_optimizer = optim.Adadelta(word_model.parameters(), lr = params.learning_rate, weight_decay = params.reg_strength)
+    vid_optimizer = optim.Adadelta(vid_model.parameters(), lr = params.learning_rate, weight_decay = params.reg_strength)
     optimizers["word"] = word_optimizer
     optimizers["vid"] = vid_optimizer
 
