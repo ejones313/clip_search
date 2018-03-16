@@ -1,6 +1,6 @@
 {
     "lr": 1,
-    "batch_size": 16,
+    "batch_size": 64,
     "num_epochs": 20,
     "margin": 0.1,
     "train_file": "train_",

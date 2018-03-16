@@ -404,3 +404,17 @@
 2018-03-15 15:13:49,333:INFO: Epoch 17/20
 2018-03-15 15:13:51,110:INFO: Epoch 18/20
 2018-03-15 15:13:52,933:INFO: Epoch 19/20
+2018-03-15 21:15:39,494:INFO: Loading the datasets...
+2018-03-15 21:15:39,494:INFO: - done.
+2018-03-15 21:15:39,502:INFO: Starting training for 20 epoch(s)
+2018-03-15 21:17:25,870:INFO: Loading the datasets...
+2018-03-15 21:17:25,870:INFO: - done.
+2018-03-15 21:17:25,878:INFO: Starting training for 20 epoch(s)
+2018-03-15 21:17:49,295:INFO: Loading the datasets...
+2018-03-15 21:17:49,295:INFO: - done.
+2018-03-15 21:17:49,301:INFO: Starting training for 20 epoch(s)
+2018-03-15 21:17:49,343:INFO: Epoch 1/20
+2018-03-15 21:17:51,457:INFO: Epoch 2/20
+2018-03-15 21:17:53,215:INFO: Epoch 3/20
+2018-03-15 21:17:55,007:INFO: Epoch 4/20
+2018-03-15 21:17:56,958:INFO: Epoch 5/20

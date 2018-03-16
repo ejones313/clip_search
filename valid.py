@@ -23,15 +23,15 @@ def validate_L2(word_model, vid_model, things, indices, cuda = False):
     word_output, word_lengths = nn.utils.rnn.pad_packed_sequence(word_output)
     vid_output, vid_lengths = nn.utils.rnn.pad_packed_sequence(vid_output)
 
-    word_order = np.zeros(word_indices.shape)
-    vid_order = np.zeros(vid_indices.shape)
+    # Unscramble output
+    word_order = torch.zeros(word_indices.shape).long()
+    vid_order = torch.zeros(vid_indices.shape).long()
     for i in range(word_indices.size()[0]):
         word_order[word_indices[i]] = i
         vid_order[vid_indices[i]] = i
-    word_output = word_output[np.array(word_lengths)-1, np.arange(word_output.shape[1]), :]
-    vid_output = vid_output[np.array(vid_lengths)-1, np.arange(vid_output.shape[1]), :]
-    word_unscrambled = word_output[word_order,:].data.numpy()
-    vid_unscrambled = vid_output[vid_order,:].data.numpy()
+
+    word_unscrambled = utils.unscramble(word_output, word_lengths, word_order, word_indices.size()[0], cuda)
+    vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_order, word_indices.size()[0], cuda)
 
     dist_matrix = np.zeros((word_unscrambled.shape[0], word_unscrambled.shape[0]))
     
