@@ -9,7 +9,9 @@ class Dataset():
 
     def __init__(self, filename = None, anchor_is_phrase = True, data = None, cuda = False):
         if filename != None:
-            self.pairs_dict = pickle.load( open( filename, "rb" ) )
+            self.pairs_dict = pickle.load(open(filename[0], "rb"))
+            for i in range(len(filename)):
+                self.pairs_dict.update(pickle.load( open( filename[i], "rb" ) ))
         elif data != None:
             self.pairs_dict = dict(data)
 

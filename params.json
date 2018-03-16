@@ -3,8 +3,8 @@
     "batch_size": 16,
     "num_epochs": 20,
     "margin": 0.1,
-    "train_file": "train_16.pkl",
-    "val_file": "train_16.pkl",
+    "train_file": "train_",
+    "val_file": "val.pkl",
     "reg_strength": 0,
 
     "hidden_dim": 64,

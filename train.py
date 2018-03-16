@@ -193,8 +193,11 @@ def main(params, args):
 
     # load data
     filenames = {}
-    filenames["train"] = params.train_file
-    filenames["val"] = params.val_file
+    train_names = []
+    for i in range(10):
+        train_names.append(params.train_file + str(i) + '.pkl')
+    filenames["train"] = train_names
+    filenames["val"] = [params.val_file]
     logging.info("- done.")
 
     # Define the models and optimizers
@@ -205,8 +208,8 @@ def main(params, args):
     models["vid"] = vid_model
 
     optimizers = {}
-    word_optimizer = optim.Adadelta(word_model.parameters(), lr = params.learning_rate, weight_decay = params.reg_strength)
-    vid_optimizer = optim.Adadelta(vid_model.parameters(), lr = params.learning_rate, weight_decay = params.reg_strength)
+    word_optimizer = optim.Adadelta(word_model.parameters(), lr = params.lr, weight_decay = params.reg_strength)
+    vid_optimizer = optim.Adadelta(vid_model.parameters(), lr = params.lr, weight_decay = params.reg_strength)
     optimizers["word"] = word_optimizer
     optimizers["vid"] = vid_optimizer
 
