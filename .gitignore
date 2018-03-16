@@ -4,3 +4,8 @@
 *.pyc
 *.pyc
 *.pyc
+*.log
+*.tar
+train_16.pkl
+*.pkl
+*.log

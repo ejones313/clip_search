@@ -1,10 +1,14 @@
 {
-    "learning_rate": 1e-3,
-    "batch_size": 5,
-    "num_epochs": 10,
+    "lr": 1,
+    "batch_size": 64,
+    "num_epochs": 20,
+    "margin": 0.1,
+    "train_file": "train_",
+    "val_file": "val.pkl",
+    "reg_strength": 0,
 
-    "lstm_hidden_dim": 50,
-    "embedding_dim": 50,
-
+    "hidden_dim": 64,
+    "word_embedding_dim": 300,
+    "vid_embedding_dim": 500,
     "save_summary_steps": 100
 }
