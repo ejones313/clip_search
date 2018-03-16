@@ -18,14 +18,13 @@ def search():
     json_path = os.path.join(args.model_dir, 'params.json')
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
-    params.num_epochs = 100
-    params.train_file = "train_1000.pkl"
-    params.val_file = "val_500.pkl"
 
-    learning_rates = [0.1, 1, 5]
-    margins = generate_values(4, -4, 0)
-    hidden_dims = [32, 64, 128, 256, 512]
-    reg_strengths = generate_values(5, -6, -2)
+    params.num_epochs = 30
+
+    learning_rates = [0.1, 1]
+    margins = [0.03, 0.1, 0.3]
+    hidden_dims = [64, 256]
+    reg_strengths = generate_values(3, -6, -2)
 
     best_val_prctile = float("-inf")
     best_val_dist_diff = -1
@@ -43,6 +42,7 @@ def search():
                     params.reg_strength = float(reg_strength)
 
                     (avg_prctile, avg_dist_diff) = train.main(params, args)
+                    print("LR: {}, Margin: {}, Hidden Dim: {}, Reg Strength: {}, Avg Percentile: {}, Avg P - N dist: {}")
                     if avg_prctile > best_val_prctile:
                         opt_rate = rate
                         opt_margin = margin

@@ -1,7 +1,7 @@
 {
     "lr": 1,
     "batch_size": 64,
-    "num_epochs": 20,
+    "num_epochs": 30,
     "margin": 0.1,
     "train_file": "train_",
     "val_file": "val.pkl",

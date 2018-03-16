@@ -78,6 +78,10 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
             word_order[word_indices[i]] = i
             vid_order[video_indices[i]] = i
 
+        if params.cuda:
+            word_order = word_order.cuda()
+            vid_order = vid_order.cuda()
+
         word_unscrambled = utils.unscramble(word_output, word_lengths, word_order, batch_size, params.cuda)
         video_unscrambled = utils.unscramble(video_output, video_lengths, vid_order, batch_size, params.cuda)
 
@@ -151,6 +155,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
     best_dist_diff = -1
     #Train
     start_time = datetime.now()
+    epoch = 0
     for epoch in range(params.num_epochs):
         is_best = False
         logging.info("Epoch {}/{}".format(epoch + 1, params.num_epochs))

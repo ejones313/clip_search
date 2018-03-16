@@ -30,13 +30,17 @@ def validate_L2(word_model, vid_model, things, indices, cuda = False):
         word_order[word_indices[i]] = i
         vid_order[vid_indices[i]] = i
 
+    if cuda:
+        word_order = word_order.cuda()
+        vid_order = vid_order.cuda()
+
     word_unscrambled = utils.unscramble(word_output, word_lengths, word_order, word_indices.size()[0], cuda)
     vid_unscrambled = utils.unscramble(vid_output, vid_lengths, vid_order, word_indices.size()[0], cuda)
 
     dist_matrix = np.zeros((word_unscrambled.shape[0], word_unscrambled.shape[0]))
     
     for i in range(word_unscrambled.shape[0]):
-        dist_matrix[i,:] = np.linalg.norm(word_unscrambled[i,:] - vid_unscrambled, axis = 1, keepdims = True).T
+        dist_matrix[i,:] = np.linalg.norm(word_unscrambled[i,:].data - vid_unscrambled.data, axis = 1, keepdims = True).T
         
     avg_prctile_pos = np.sum(dist_matrix.T > np.diag(dist_matrix))/(dist_matrix.shape[0]**2)
     avg_dist_diff = np.mean((np.diag(dist_matrix) - (np.sum(dist_matrix, axis = 1) - np.diag(dist_matrix))/(dist_matrix.shape[0] - 1)))
