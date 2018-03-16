@@ -94,12 +94,12 @@ def train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, dataSet
         for triplet_type in range(1):
             for anchor_num in range(batch_size):
                 if triplet_type == 0:
-                    A = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
-                    P = torch.unsqueeze(video_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
+                    A = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).expand(batch_size, -1)
+                    P = torch.unsqueeze(video_unscrambled[anchor_num,:], 0).expand(batch_size, -1)
                     N = video_unscrambled
                 else:
-                    A = torch.unsqueeze(video_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
-                    P = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).repeat(batch_size,1)
+                    A = torch.unsqueeze(video_unscrambled[anchor_num,:], 0).expand(batch_size, -1)
+                    P = torch.unsqueeze(word_unscrambled[anchor_num,:], 0).expand(batch_size, -1)
                     N = word_unscrambled
                 loss = loss + loss_fn(A,P,N)
         

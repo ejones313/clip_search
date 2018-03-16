@@ -22,7 +22,7 @@ def search():
     params.train_file = "train_1000.pkl"
     params.val_file = "val_500.pkl"
 
-    learning_rates = generate_values(10, -5, 0.5)
+    learning_rates = [0.1, 1, 5]
     margins = generate_values(6, -4, 0)
     hidden_dims = [32, 64, 128, 256, 512]
     reg_strengths = generate_values(9, -6, -2)
