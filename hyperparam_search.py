@@ -23,9 +23,9 @@ def search():
     params.val_file = "val_500.pkl"
 
     learning_rates = [0.1, 1, 5]
-    margins = generate_values(6, -4, 0)
+    margins = generate_values(4, -4, 0)
     hidden_dims = [32, 64, 128, 256, 512]
-    reg_strengths = generate_values(9, -6, -2)
+    reg_strengths = generate_values(5, -6, -2)
 
     best_val_prctile = float("-inf")
     best_val_dist_diff = -1

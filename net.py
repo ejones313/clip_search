@@ -17,9 +17,9 @@ class Net(nn.Module):
         """
         super(Net, self).__init__()
         if anchor_is_phrase:
-            self.lstm = nn.LSTM(params.word_embedding_dim, params.hidden_dim, 1, bidirectional=True)#, batch_first=True)
+            self.lstm = nn.LSTM(params.word_embedding_dim, params.hidden_dim, 1)#, batch_first=True)
         else:
-            self.lstm = nn.LSTM(params.vid_embedding_dim, params.hidden_dim, 1, bidirectional=True)#, batch_first=True)
+            self.lstm = nn.LSTM(params.vid_embedding_dim, params.hidden_dim, 1)#, batch_first=True)
 
     def forward(self, s, anchor_is_phrase = False):
         """
