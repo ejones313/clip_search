@@ -180,7 +180,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'val_dist_diff': dist_diff,
                                 'train_loss': train_loss}, is_best =is_best,
                                 checkpoint="weights_and_val")
-    return(best_val, best_dist_diff)
+    return best_val, best_dist_diff
 
 def main(params, args):
     # use GPU if available
@@ -223,7 +223,8 @@ def main(params, args):
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    return(train_and_evaluate(models, optimizers, filenames, loss_fn, params))
+    avg_prctile, avg_dist_diff = train_and_evaluate(models, optimizers, filenames, loss_fn, params)
+    return avg_prctile, avg_dist_diff, word_model, vid_model
 
 
 if __name__ == '__main__':

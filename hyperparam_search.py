@@ -19,12 +19,12 @@ def search():
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
 
-    params.num_epochs = 30
+    params.num_epochs = 1
 
-    learning_rates = [0.1, 1]
-    margins = [0.03, 0.1, 0.3]
-    hidden_dims = [64, 256]
-    reg_strengths = generate_values(3, -6, -2)
+    learning_rates = [0.1]
+    margins = [0.3]
+    hidden_dims = [256]
+    reg_strengths = [0.000008]#generate_values(3, -6, -2)
 
     best_val_prctile = float("-inf")
     best_val_dist_diff = -1
@@ -41,7 +41,7 @@ def search():
                     params.hidden_dim = hidden_dim
                     params.reg_strength = float(reg_strength)
 
-                    (avg_prctile, avg_dist_diff) = train.main(params, args)
+                    avg_prctile, avg_dist_diff, word_model, vid_model = train.main(params, args)
                     print("LR: {}, Margin: {}, Hidden Dim: {}, Reg Strength: {}, Avg Percentile: {}, Avg P - N dist: {}")
                     if avg_prctile > best_val_prctile:
                         opt_rate = rate
@@ -50,6 +50,8 @@ def search():
                         opt_reg_strength = reg_strength
                         best_val_prctile = avg_prctile
                         best_val_dist_diff = avg_dist_diff
+                        torch.save(word_model, 'word_best.pt')
+                        torch.save(vid_model, 'vid_best.pt')
 
     print('Optimal Learning Rate: %f\nOptimal Margin: %f\nOptimal hidden_dim: %d\nOptimal Regularization: %f' % (opt_rate, opt_margin, opt_hidden_dim, opt_reg_strength))
 
