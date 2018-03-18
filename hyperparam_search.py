@@ -3,6 +3,7 @@ import train
 import utils
 import os
 import argparse
+import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/small', help="Directory containing the dataset")
@@ -19,7 +20,7 @@ def search():
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
 
-    params.num_epochs = 1
+    params.num_epochs = 30
 
     learning_rates = [0.1]
     margins = [0.3]
@@ -42,7 +43,7 @@ def search():
                     params.reg_strength = float(reg_strength)
 
                     avg_prctile, avg_dist_diff, word_model, vid_model = train.main(params, args)
-                    print("LR: {}, Margin: {}, Hidden Dim: {}, Reg Strength: {}, Avg Percentile: {}, Avg P - N dist: {}")
+                    print("LR: {}, Margin: {}, Hidden Dim: {}, Reg Strength: {}, Avg Percentile: {}, Avg P - N dist: {}".format(rate, margin, hidden_dim, reg_strength, avg_prctile, avg_dist_diff))
                     if avg_prctile > best_val_prctile:
                         opt_rate = rate
                         opt_margin = margin
