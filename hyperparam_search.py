@@ -4,6 +4,7 @@ import utils
 import os
 import argparse
 import torch
+import json
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/small', help="Directory containing the dataset")
@@ -23,9 +24,9 @@ def search():
     params.num_epochs = 30
 
     learning_rates = [0.1]
-    margins = [0.3]
+    margins = [0.7, 1, 1.3]
     hidden_dims = [256]
-    reg_strengths = [0.000008]#generate_values(3, -6, -2)
+    reg_strengths = [0.001, 0.01]#generate_values(3, -6, -2)
 
     best_val_prctile = float("-inf")
     best_val_dist_diff = -1
