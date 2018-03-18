@@ -20,6 +20,8 @@ from datetime import datetime
 from valid import validate_L2
 from valid import validate_cosine
 
+import json
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/small', help="Directory containing the dataset")
@@ -153,6 +155,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
 
     best_val = float("-inf")
     best_dist_diff = -1
+    best_dist_matrix = None
     #Train
     start_time = datetime.now()
     epoch = 0
@@ -162,13 +165,18 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
         print("Starting epoch: {}. Time elapsed: {}".format(epoch+1, str(datetime.now()-start_time)))
         train_loss = train(word_model, vid_model, word_optimizer, vid_optimizer, loss_fn, train_dataset, params)[0]
 
-        things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
-        avg_prctile, dist_diff = validate_L2(word_model, vid_model, things, indices, cuda = params.cuda)
+        if epoch == 0:
+            things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len(), store_names = True)
+        else:
+            things, indices = val_dataset.get_pairs(0, val_dataset.pairs_len())
+
+        avg_prctile, dist_diff, dist_matrix = validate_L2(word_model, vid_model, things, indices, cuda = params.cuda)
         print("Train Loss: {}, Val Scores: (Pos_prctile: {}, Pos_dist-Neg_dist: {})\n".format(train_loss, avg_prctile, dist_diff))
 
         if avg_prctile > best_val:
             best_val = avg_prctile
             best_dist_diff = dist_diff
+            best_dist_matrix = dist_matrix
             is_best = True
 
         utils.save_checkpoint({'epoch': epoch +1,
@@ -180,7 +188,7 @@ def train_and_evaluate(models, optimizers, filenames, loss_fn, params, anchor_is
                                 'val_dist_diff': dist_diff,
                                 'train_loss': train_loss}, is_best =is_best,
                                 checkpoint="weights_and_val")
-    return best_val, best_dist_diff
+    return best_val, best_dist_diff, best_dist_matrix, val_dataset.phrases, val_dataset.vid_ids
 
 def main(params, args):
     # use GPU if available
@@ -223,8 +231,8 @@ def main(params, args):
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    avg_prctile, avg_dist_diff = train_and_evaluate(models, optimizers, filenames, loss_fn, params)
-    return avg_prctile, avg_dist_diff, word_model, vid_model
+    avg_prctile, avg_dist_diff, dist_matrix, phrases, ids = train_and_evaluate(models, optimizers, filenames, loss_fn, params)
+    return avg_prctile, avg_dist_diff, word_model, vid_model, dist_matrix, phrases, ids
 
 
 if __name__ == '__main__':
@@ -235,4 +243,16 @@ if __name__ == '__main__':
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = utils.Params(json_path)
 
-    main(params, args)
+    avg_prctile, avg_dist_diff, word_model, vid_model, dist_matrix, phrases, ids = main(params, args)
+
+    torch.save(word_model, 'word_best.pt')
+    torch.save(vid_model, 'vid_best.pt')
+    np.save('best_dist_matrix.npy', dist_matrix)
+
+    f = open('phrases.txt', 'w')
+    json.dump(phrases, f)
+    f.close()
+    g = open('vid_ids.txt', 'w')
+    json.dump(ids, g)
+    g.close()
+

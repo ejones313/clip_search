@@ -45,7 +45,7 @@ def validate_L2(word_model, vid_model, things, indices, cuda = False):
     avg_prctile_pos = np.sum(dist_matrix.T > np.diag(dist_matrix))/(dist_matrix.shape[0]**2)
     avg_dist_diff = np.mean((np.diag(dist_matrix) - (np.sum(dist_matrix, axis = 1) - np.diag(dist_matrix))/(dist_matrix.shape[0] - 1)))
 
-    return float(avg_prctile_pos), float(avg_dist_diff)
+    return float(avg_prctile_pos), float(avg_dist_diff), dist_matrix
 
 
 def validate_cosine(word_model, vid_model, things, indices, cuda = False):
@@ -80,4 +80,4 @@ def validate_cosine(word_model, vid_model, things, indices, cuda = False):
     avg_prctile_pos = np.sum(prod_matrix.T < np.diag(prod_matrix))/(prod_matrix.shape[0]**2)
     avg_dist_diff = -1*np.mean((np.diag(prod_matrix) - (np.sum(prod_matrix, axis = 1) - np.diag(prod_matrix))/(prod_matrix.shape[0] - 1)))
 
-    return float(avg_prctile_pos), float(avg_dist_diff)
+    return float(avg_prctile_pos), float(avg_dist_diff), prod_matrix

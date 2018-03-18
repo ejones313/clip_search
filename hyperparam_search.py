@@ -42,7 +42,7 @@ def search():
                     params.hidden_dim = hidden_dim
                     params.reg_strength = float(reg_strength)
 
-                    avg_prctile, avg_dist_diff, word_model, vid_model = train.main(params, args)
+                    avg_prctile, avg_dist_diff, word_model, vid_model, dist_matrix, phrases, ids = train.main(params, args)
                     print("LR: {}, Margin: {}, Hidden Dim: {}, Reg Strength: {}, Avg Percentile: {}, Avg P - N dist: {}".format(rate, margin, hidden_dim, reg_strength, avg_prctile, avg_dist_diff))
                     if avg_prctile > best_val_prctile:
                         opt_rate = rate
@@ -53,6 +53,8 @@ def search():
                         best_val_dist_diff = avg_dist_diff
                         torch.save(word_model, 'word_best.pt')
                         torch.save(vid_model, 'vid_best.pt')
+                        np.save('best_dist_matrix.npy', dist_matrix)
+                        
 
     print('Optimal Learning Rate: %f\nOptimal Margin: %f\nOptimal hidden_dim: %d\nOptimal Regularization: %f' % (opt_rate, opt_margin, opt_hidden_dim, opt_reg_strength))
 

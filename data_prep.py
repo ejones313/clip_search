@@ -32,8 +32,31 @@ class Dataset():
             triplet = self.triplets_clips[index]
         return triplet
 
-    def retrieve_embeddings(self, start, end):
-        embedding_tuples = list(self.pairs_dict.values())
+    def retrieve_embeddings(self, start, end, store_names = False):
+        embedding_tuples = list(self.pairs_dict.items())
+
+        # Pairs of positive examples. First is videos, second is captions.
+        dataset = [[],[]]
+        lengths = [[],[]]
+        num_tuples = len(embedding_tuples)
+        phrases = []
+        vid_ids = []
+
+        for i in range(start, end):
+            item = embedding_tuples[i][1]
+            for type in range(2):
+                dataset[type].append(item[type])
+                lengths[type].append(item[type].shape[0])
+            phrases.append(embedding_tuples[i][0])
+            vid_ids.append(item[2])
+
+        if store_names:
+            self.phrases = phrases
+            self.vid_ids = vid_ids
+
+        return dataset, lengths, num_tuples
+
+        '''embedding_tuples = list(self.pairs_dict.values())
 
         # Pairs of positive examples. First is videos, second is captions.
         dataset = [[],[]]
@@ -46,11 +69,11 @@ class Dataset():
                 dataset[type].append(item[type])
                 lengths[type].append(item[type].shape[0])
 
-        return dataset, lengths, num_tuples
+        return dataset, lengths, num_tuples'''
 
-    def get_pairs(self, start, end):
+    def get_pairs(self, start, end, store_names = False):
         #First is vids, second is captions in dataset
-        dataset, lengths, num_tuples = self.retrieve_embeddings(start, end)
+        dataset, lengths, num_tuples = self.retrieve_embeddings(start, end, store_names = store_names)
 
         # Sorted indices, first is vids, second is captions
         indices = [[],[]]
