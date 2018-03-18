@@ -54,7 +54,13 @@ def search():
                         torch.save(word_model, 'word_best.pt')
                         torch.save(vid_model, 'vid_best.pt')
                         np.save('best_dist_matrix.npy', dist_matrix)
-                        
+                        f = open('phrases.txt', 'w')
+                        json.dump(phrases, f)
+                        f.close()
+                        g = open('vid_ids.txt', 'w')
+                        json.dump(ids, g)
+                        g.close()
+
 
     print('Optimal Learning Rate: %f\nOptimal Margin: %f\nOptimal hidden_dim: %d\nOptimal Regularization: %f' % (opt_rate, opt_margin, opt_hidden_dim, opt_reg_strength))
 
