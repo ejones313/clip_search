@@ -41,6 +41,7 @@ class Dataset():
         num_tuples = len(embedding_tuples)
         phrases = []
         vid_ids = []
+        time_stamps = []
 
         for i in range(start, end):
             item = embedding_tuples[i][1]
@@ -49,10 +50,12 @@ class Dataset():
                 lengths[type].append(item[type].shape[0])
             phrases.append(embedding_tuples[i][0])
             vid_ids.append(item[2])
+            time_stamps.append(item[3])
 
         if store_names:
             self.phrases = phrases
             self.vid_ids = vid_ids
+            self.time_stamps = time_stamps
 
         return dataset, lengths, num_tuples
 
