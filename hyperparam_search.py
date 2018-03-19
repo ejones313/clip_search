@@ -4,6 +4,7 @@ import utils
 import os
 import argparse
 import torch
+import json
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='data/small', help="Directory containing the dataset")
@@ -23,9 +24,9 @@ def search():
     params.num_epochs = 30
 
     learning_rates = [0.1]
-    margins = [0.3]
+    margins = [0.7, 1, 1.3]
     hidden_dims = [256]
-    reg_strengths = [0.000008]#generate_values(3, -6, -2)
+    reg_strengths = [0.001, 0.01]#generate_values(3, -6, -2)
 
     best_val_prctile = float("-inf")
     best_val_dist_diff = -1
@@ -42,7 +43,7 @@ def search():
                     params.hidden_dim = hidden_dim
                     params.reg_strength = float(reg_strength)
 
-                    avg_prctile, avg_dist_diff, word_model, vid_model = train.main(params, args)
+                    avg_prctile, avg_dist_diff, word_model, vid_model, dist_matrix, phrases, ids = train.main(params, args)
                     print("LR: {}, Margin: {}, Hidden Dim: {}, Reg Strength: {}, Avg Percentile: {}, Avg P - N dist: {}".format(rate, margin, hidden_dim, reg_strength, avg_prctile, avg_dist_diff))
                     if avg_prctile > best_val_prctile:
                         opt_rate = rate
@@ -53,6 +54,14 @@ def search():
                         best_val_dist_diff = avg_dist_diff
                         torch.save(word_model, 'word_best.pt')
                         torch.save(vid_model, 'vid_best.pt')
+                        np.save('best_dist_matrix.npy', dist_matrix)
+                        f = open('phrases.txt', 'w')
+                        json.dump(phrases, f)
+                        f.close()
+                        g = open('vid_ids.txt', 'w')
+                        json.dump(ids, g)
+                        g.close()
+
 
     print('Optimal Learning Rate: %f\nOptimal Margin: %f\nOptimal hidden_dim: %d\nOptimal Regularization: %f' % (opt_rate, opt_margin, opt_hidden_dim, opt_reg_strength))
 
