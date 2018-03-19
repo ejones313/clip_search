@@ -56,21 +56,6 @@ class Dataset():
 
         return dataset, lengths, num_tuples
 
-        '''embedding_tuples = list(self.pairs_dict.values())
-
-        # Pairs of positive examples. First is videos, second is captions.
-        dataset = [[],[]]
-        lengths = [[],[]]
-        num_tuples = len(embedding_tuples)
-
-        for i in range(start, end):
-            item = embedding_tuples[i]
-            for type in range(2):
-                dataset[type].append(item[type])
-                lengths[type].append(item[type].shape[0])
-
-        return dataset, lengths, num_tuples'''
-
     def get_pairs(self, start, end, store_names = False):
         #First is vids, second is captions in dataset
         dataset, lengths, num_tuples = self.retrieve_embeddings(start, end, store_names = store_names)
