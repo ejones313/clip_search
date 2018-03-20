@@ -1,13 +1,13 @@
 {
     "lr": 1,
-    "batch_size": 512,
+    "batch_size": 128,
     "num_epochs": 30,
-    "margin": 0.1,
+    "margin": 2.5,
     "train_file": "train_",
     "val_file": "val.pkl",
-    "reg_strength": 0,
+    "reg_strength": 0.001,
 
-    "hidden_dim": 64,
+    "hidden_dim": 400,
     "word_embedding_dim": 300,
     "vid_embedding_dim": 500,
     "save_summary_steps": 100
