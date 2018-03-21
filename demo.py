@@ -57,6 +57,15 @@ def get_best_index(vid_embeddings, caption_embedding, num_best = 1):
     best_indices = np.argsort(np.linalg.norm(caption_embedding - vid_embeddings, axis = 1))
     return best_indices[0:num_best]
 
+def to_time(float_time):
+    int_time = int(float_time)
+    num_minutes = int_time // 60
+    num_seconds = int_time - 60 * num_minutes
+    str_time = str(num_minutes) + ":" + str(num_seconds)
+    if num_seconds < 10:
+        str_time = str(num_minutes) + ":0" + str(num_seconds)
+    return str_time
+
 
 def main(preprocessed = True):
     start = datetime.now()
@@ -87,6 +96,7 @@ def main(preprocessed = True):
         vid_embeddings = vid_embeddings.data.numpy()
     print("Ready! Total time: ", str(datetime.now() - start))
     caption_input = input("Enter a caption (q to quit): ")
+    same_caption_count = 1
     while caption_input.lower() != "q":
         caption_vec = get_caption_vector(word_embedding_model, caption_input)
         if caption_vec is not None:
@@ -94,27 +104,36 @@ def main(preprocessed = True):
             caption_embedding = word_model(caption_vec)
             caption_embedding = caption_embedding.data.numpy()[-1, :, :]
             start = datetime.now()
-            best_video_indices = get_best_index(vid_embeddings, caption_embedding)
+            best_video_indices = get_best_index(vid_embeddings, caption_embedding, num_best = same_caption_count)
+            #Takes last one, which is the only new one?
+            vid_index = best_video_indices[-1]
             print("TIME: ", str(datetime.now() - start))
-            best_vid_ids = []
-            best_timestamps = []
-            for i in best_video_indices:
-                vid_id = vid_ids[i]
-                timestamp = timestamps[i]
-                best_vid_ids.append(vid_id)
-                best_timestamps.append(timestamp)
-                list_vid_id = list(vid_id)
-                list_vid_id[1] = "="
-                vid_id = "".join(list_vid_id)
-                url = "https://www.youtube.com/watch?" + vid_id
-                print("URL: ", url)
-                print("Start: {}, End: {}".format(timestamp[0], timestamp[1]))
-                watch = "ERIK"
-                while watch.lower()[0] not in ['y', 'n']:
-                    watch = input("Want to load the URL? (y/n): ")
-                if watch.lower()[0] == 'y':
-                    webbrowser.open(url)
-        caption_input = input("Enter a caption (q to quit): ")
+            vid_id = vid_ids[vid_index]
+            timestamp = timestamps[vid_index]
+            #Python trash to convert video id to a URL.
+            list_vid_id = list(vid_id)
+            list_vid_id[1] = "="
+            vid_id = "".join(list_vid_id)
+            url = "https://www.youtube.com/watch?" + vid_id
+            print("URL: ", url)
+            print("Start: {}, End: {}".format(to_time(timestamp[0]), to_time(timestamp[1])))
+            watch = input("Want to load the URL? (y/n): ")
+            while watch.lower()[0] not in ['y', 'n']:
+                print("Invalid response.")
+                watch = input("Want to load the URL? (y/n): ")
+            if watch.lower()[0] == 'y':
+                webbrowser.open(url)
+            prev_input = caption_input
+        #invalid word entered to get_caption_vector
+        else:
+            same_caption_count = 1
+            prev_input = None
+        caption_input = input("Enter a caption (q to quit, t to try next video): ")
+        if caption_input.lower() == 't' and prev_input is not None:
+            caption_input = prev_input
+            same_caption_count += 1
+        else:
+            same_caption_count = 1
 
 if __name__ == '__main__':
     main()
