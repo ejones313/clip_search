@@ -209,8 +209,8 @@ def main(params, args):
     train_names = []
     for i in range(10):
         train_names.append(params.train_file + str(i) + '.pkl')
-    filenames["train"] = train_names
-    filenames["val"] = [params.val_file]
+    filenames["train"] = ["data_" + str(i) + '.pkl' for i in range(25)]
+    filenames["val"] = ["data_" + str(i) + '.pkl' for i in range(25, 36)]
     logging.info("- done.")
 
     # Define the models and optimizers
